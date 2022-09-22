@@ -47,8 +47,8 @@ setup_mlp() {
 
     # persistent PATH and PYTHONPATH parts that should be
     # priotized over any additions made in sandboxes
-    export MLP_PERSISTENT_PATH="${MLP_BASE}/bin:${MLP_SOFTWARE_BASE}/bin"
-    export MLP_PERSISTENT_PYTHONPATH="${MLP_BASE}"
+    export MLP_PERSISTENT_PATH="${MLP_BASE}/bin:${MLP_BASE}/modules/law/bin:${MLP_SOFTWARE_BASE}/bin"
+    export MLP_PERSISTENT_PYTHONPATH="${MLP_BASE}:${MLP_BASE}/modules/law"
 
     # prepend them
     export PATH="${MLP_PERSISTENT_PATH}:${PATH}"
@@ -66,6 +66,30 @@ setup_mlp() {
     # prepend persistent path fragments again for ensure priority for local packages
     export PATH="${MLP_PERSISTENT_PATH}:${PATH}"
     export PYTHONPATH="${MLP_PERSISTENT_PYTHONPATH}:${PYTHONPATH}"
+
+
+    #
+    # initialize / update submodules
+    #
+
+    for mpath in modules/law; do
+        # do nothing when the path does not exist or it is not a submodule
+        if [ ! -d "${mpath}" ] || [ ! -f "${mpath}/.git" ] ; then
+            continue
+        fi
+
+        # initialize the submodule when the directory is empty
+        if [ "$( ls -1q "${mpath}" | wc -l )" = "0" ]; then
+            git submodule update --init --recursive "${mpath}"
+        else
+            # update when not on a working branch and there are no changes
+            local detached_head="$( ( cd "${mpath}"; git symbolic-ref -q HEAD &> /dev/null ) && echo "true" || echo "false" )"
+            local changed_files="$( cd "${mpath}"; git status --porcelain=v1 2> /dev/null | wc -l )"
+            if ! ${detached_head} && [ "${changed_files}" = "0" ]; then
+                git submodule update --init --recursive "${mpath}"
+            fi
+        fi
+    done
 
 
     #

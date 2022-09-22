@@ -1,0 +1,3 @@
+[submodule "modules/law"]
+    path = modules/law
+    url = ../../riga/law.git
