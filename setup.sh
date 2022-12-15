@@ -61,7 +61,7 @@ setup_mlp() {
     fi
 
     # source the default sandbox
-    source "${MLP_BASE}/sandboxes/venv_default.sh" ""
+    source "${MLP_BASE}/sandboxes/venv_default.sh" "$@"
 
     # prepend persistent path fragments again for ensure priority for local packages
     export PATH="${MLP_PERSISTENT_PATH}:${PATH}"
@@ -96,6 +96,7 @@ setup_mlp() {
     # law setup
     #
 
+
     export LAW_HOME="${MLP_BASE}/.law"
     export LAW_CONFIG_FILE="${MLP_BASE}/law.cfg"
 
@@ -103,9 +104,14 @@ setup_mlp() {
         # source law's bash completion scipt
         source "$( law completion )" ""
 
+        # echo "after source completion"
+
         # silently index
         law index -q
+
+        # echo "after law index -q"
     fi
+
 }
 
 if setup_mlp "$@"; then
