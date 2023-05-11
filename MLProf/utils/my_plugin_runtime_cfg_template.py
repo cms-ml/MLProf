@@ -19,7 +19,7 @@ options.register("filename",
                  )
 options.parseArguments()
 
-data = "/afs/desy.de/user/p/prouvost/xxl/af-cms/create_frozen_graphs/networks/simple_dnn.pb"
+data = "GRAPH_PATH_PLACEHOLDER"
 
 
 # define the process to run
@@ -31,7 +31,7 @@ process.MessageLogger.cerr.FwkReport.reportEvery = 1
 process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(10))
 process.source = cms.Source(
     "PoolSource",
-    fileNames=cms.untracked.vstring("file://" + "/afs/cern.ch/user/n/nprouvos/public/testfile.root"),
+    fileNames=cms.untracked.vstring("file://" + "INPUT_FILES_PLACEHOLDER"),
 )
 
 # process options
@@ -43,16 +43,16 @@ process.options = cms.untracked.PSet(
 # setup MyPluginRuntime by loading the auto-generated cfi (see MyPlugin.fillDescriptions)
 process.load("MLProf.RuntimeModule.myPluginRuntime_cfi")
 process.myPluginRuntime.graphPath = cms.string(data)
-process.myPluginRuntime.inputTensorNames = cms.vstring(['input_0'])
-process.myPluginRuntime.outputTensorNames = cms.string("Identity")
-process.myPluginRuntime.filenameOutputCsv = cms.string("/afs/desy.de/user/p/prouvost/xxl/af-cms/MLProf/data/RuntimeMeasurement/test_simple_dnn_workflow/" + options.filename)
-process.myPluginRuntime.inputType = cms.string("random")
-# add untracked?
-process.myPluginRuntime.inputSizes = cms.vint32([784])
-process.myPluginRuntime.inputLengths = cms.vint32([1])
-process.myPluginRuntime.outputSizes = cms.int32(1)
-process.myPluginRuntime.numberRuns = cms.int32(500)
-process.myPluginRuntime.numberWarmUps = cms.int32(50)
+process.myPluginRuntime.inputTensorNames = cms.vstring(INPUT_TENSOR_NAME_PLACEHOLDER)
+process.myPluginRuntime.outputTensorNames = cms.string("OUTPUT_TENSOR_NAME_PLACEHOLDER")
+process.myPluginRuntime.filenameOutputCsv = cms.string("OUTPUT_DIRECTORY_PLACEHOLDER" + options.filename)
+process.myPluginRuntime.inputType = cms.string("INPUT_TYPE_PLACEHOLDER")
+
+process.myPluginRuntime.inputSizes = cms.vint32(INPUT_SIZE_PLACEHOLDER)
+process.myPluginRuntime.inputLengths = cms.vint32(INPUT_CLASS_DIMENSION_PLACEHOLDER)
+process.myPluginRuntime.outputSizes = cms.int32(OUTPUT_SIZE_PLACEHOLDER)
+process.myPluginRuntime.numberRuns = cms.int32(NUMBER_RUNS_PLACEHOLDER)
+process.myPluginRuntime.numberWarmUps = cms.int32(NUMBER_WARM_UPS_PLACEHOLDER)
 #process.myPluginRuntime.batchsizes = cms.vint32(BATCH_SIZES_PLACEHOLDER)
 process.myPluginRuntime.batchsizes = cms.vint32(list(options.batchsizes))
 # process.myPluginRuntime.batchsizes = cms.int32(options.batchsizes)

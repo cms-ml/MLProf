@@ -6,6 +6,8 @@
 #include <chrono>
 #include <list>
 #include <fstream>
+#include <random>
+#include <stdexcept>
 
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -38,11 +40,14 @@ private:
   void analyze(const edm::Event&, const edm::EventSetup&);
   void endJob();
 
-  std::string inputTensorName_;
-  std::string outputTensorName_;
+  std::vector<std::string> inputTensorNames_;
+  //std::vector<std::string> outputTensorNames_;
+  std::string outputTensorNames_;
   std::string filenameOutputCsv_;
-  int inputSize_;
-  int outputSize_;
+  std::string inputType_;
+  std::vector<int> inputLengths_;
+  std::vector<int> inputSizes_;
+  std::vector<int> outputSizes_;
   //std:vector batchSize_;
   int nRuns_;
   int nWarmUps_;
@@ -76,11 +81,15 @@ void MyPluginRuntime::fillDescriptions(edm::ConfigurationDescriptions& descripti
   // defining this function will lead to a *_cfi file being generated when compiling
   edm::ParameterSetDescription desc;
   desc.add<std::string>("graphPath");
-  desc.add<std::string>("inputTensorName");
-  desc.add<std::string>("outputTensorName");
+  desc.add<std::vector<std::string>>("inputTensorNames");
+  //desc.add<std::vector<std::string>>("outputTensorNames");
+  desc.add<std::string>("outputTensorNames");
   desc.add<std::string>("filenameOutputCsv");
-  desc.add<int>("inputSize");
-  desc.add<int>("outputSize");
+  desc.add<std::string>("inputType");
+  desc.add<std::vector<int>>("inputLengths");
+  desc.add<std::vector<int>>("inputSizes");
+  // desc.add<std::vector<int>>("outputSizes");
+  desc.add<int>("outputSizes");
   desc.add<std::vector<int>>("batchsizes");
   desc.add<int>("numberRuns");
   desc.add<int>("numberWarmUps");
@@ -88,11 +97,15 @@ void MyPluginRuntime::fillDescriptions(edm::ConfigurationDescriptions& descripti
 }
 
 MyPluginRuntime::MyPluginRuntime(const edm::ParameterSet& config, const CacheData* cacheData)
-    : inputTensorName_(config.getParameter<std::string>("inputTensorName")),
-      outputTensorName_(config.getParameter<std::string>("outputTensorName")),
+    : inputTensorNames_(config.getParameter<std::vector<std::string>>("inputTensorNames")),
+      //outputTensorNames_(config.getParameter<std::vector<std::string>>("outputTensorNames")),
+      outputTensorNames_(config.getParameter<std::string>("outputTensorNames")),
       filenameOutputCsv_(config.getParameter<std::string>("filenameOutputCsv")),
-      inputSize_(config.getParameter<int>("inputSize")),
-      outputSize_(config.getParameter<int>("outputSize")),
+      inputType_(config.getParameter<std::string>("inputType")),
+      inputLengths_(config.getParameter<std::vector<int>>("inputLengths")),
+      inputSizes_(config.getParameter<std::vector<int>>("inputSizes")),
+      // outputSizes_(config.getParameter<std::vector<int>>("outputSizes")),
+      outputSizes_(config.getParameter<int>("outputSizes")),
       //batchSize_(config.getParameter<std:vector>("batchSize")),
       nRuns_(config.getParameter<int>("numberRuns")),
       nWarmUps_(config.getParameter<int>("numberWarmUps")),
@@ -155,38 +168,176 @@ void print_vector(std::vector<int> const &vector)
     }
 }
 
+float choose_value(std::string type, int incremental_value, std::default_random_engine generator, std::normal_distribution<float> distribution)
+{
+  float value;
+  if (type == "incremental")
+  {
+    value = float(incremental_value);
+  }
+  else if (type == "random")
+  {
+    value = distribution(generator);
+  }
+  return value;
+}
+
+std::vector<int> get_tensor_shape(tensorflow::Tensor& tensor)
+{
+    std::vector<int> shape;
+    int num_dimensions = tensor.shape().dims();
+
+    for(int ii_dim = 0; ii_dim < num_dimensions; ii_dim++) {
+        shape.push_back(tensor.shape().dim_size(ii_dim));
+    }
+    return shape;
+}
+
 
 void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& setup) {
-  std::vector<int> batchsizes=batchsizes_;
+  std::vector<int> batchSizes = batchsizes_;
   print_vector(batchsizes_);
-  print_vector(batchsizes);
+  print_vector(batchSizes);
   std::list<float> mean_runtimes;
   std::list<float> std_runtimes;
-  for (int batchsize : batchsizes)
+  for (int batchSize : batchSizes)
   {
-    tensorflow::Tensor input(tensorflow::DT_FLOAT, {batchsize, inputSize_});
-    for (size_t i = 0; i < 10; i++)
+    std::random_device rd;
+    std::default_random_engine generator(rd());
+    std::normal_distribution<float> distribution(1.0, 1.0);
+    std::vector<tensorflow::Tensor> input_classes_vector;
+    int counter = 0;
+    tensorflow::Tensor input;
+    for (int input_class = 0; input_class < (int)inputLengths_.size(); input_class++)
     {
-      input.matrix<float>()(0, i) = float(i);
+      // definition and filling of the input tensors for the differents input classes
+      // here with if statements -> 1D,2D,3D inputs (creating input tensor with std::vector does not work.)
+      if (inputLengths_[input_class]==1)
+      {
+        input = tensorflow::Tensor(tensorflow::DT_FLOAT, {batchSize, inputSizes_[counter]});
+        auto input_eigen_mapped = input.tensor<float, 2>();
+        for (int b = 0; b < batchSize; b++)
+        {
+          for (int i = 0; i < inputSizes_[counter]; i++)
+          {
+            float value;
+            if (inputType_ == "incremental")
+            {
+              value = float(i);
+            }
+            else if (inputType_ == "random")
+            {
+              value = distribution(generator);
+            }
+            // float value = choose_value(inputType_, i, generator, distribution);
+            // input.matrix<float>()(b, i) = value;
+            input_eigen_mapped(b, i) = value;
+          }
+        }
+        counter++;
+      }
+      else if (inputLengths_[input_class]==2)
+      {
+        input = tensorflow::Tensor(tensorflow::DT_FLOAT, {batchSize, inputSizes_[counter], inputSizes_[counter+1]});
+        auto input_eigen_mapped = input.tensor<float, 3>();
+        std::cout << input.shape().dims() << std::endl;
+        for (int b = 0; b < batchSize; b++)
+        {
+          for (int i = 0; i < inputSizes_[counter]; i++)
+          {
+            for (int j = 0; j < inputSizes_[counter+1]; j++)
+            {
+              // float value = choose_value(inputType_, i+j, generator, distribution);
+              float value;
+              if (inputType_ == "incremental")
+              {
+                value = float(i+j);
+              }
+              else if (inputType_ == "random")
+              {
+                value = distribution(generator);
+              }
+              // float value = choose_value(inputType_, i, generator, distribution);
+              // input.matrix<float>()(b, i, j) = value;
+              input_eigen_mapped(b, i, j) = value;
+            }
+          }
+        }
+        counter++;
+        counter++;
+      }
+      else if (inputLengths_[input_class]==3)
+      {
+        input = tensorflow::Tensor(tensorflow::DT_FLOAT, {batchSize, inputSizes_[counter], inputSizes_[counter+1], inputSizes_[counter+2]});
+        auto input_eigen_mapped = input.tensor<float, 4>();
+        for (int b = 0; b < batchSize; b++)
+        {
+          for (int i = 0; i < inputSizes_[counter]; i++)
+          {
+            for (int j = 0; j < inputSizes_[counter+1]; j++)
+            {
+              for (int k = 0; k < inputSizes_[counter+2]; k++)
+              {
+                float value;
+                if (inputType_ == "incremental")
+                {
+                  value = float(i+j+k);
+                }
+                else if (inputType_ == "random")
+                {
+                  value = distribution(generator);
+                }
+                //float value = choose_value(inputType_, i+j+k, generator, distribution);
+                // input.matrix<float>()(b, i, j, k) = value;
+                input_eigen_mapped(b, i, j, k) = value;
+              }
+            }
+          }
+        }
+        counter++;
+        counter++;
+        counter++;
+      }
+      else
+      {
+        std::cout << "The inputs must be one-, two- or three dimensional, an error will be thrown" << std::endl;
+        throw std::invalid_argument( "input " + std::to_string(input_class) +
+                                     " with name " + inputTensorNames_[input_class] +
+                                     " has not the right dimension");
+      }
+      // feeding all input tensors into an input vector
+
+
+      input_classes_vector.push_back(input);
     }
 
-    // define the output
+    // define the output vector
     std::vector<tensorflow::Tensor> outputs;
 
+    // from cmssw source code: inputs in run function is a vector of pairs consisting of a string and a tensor
+    std::vector<std::pair<std::string, tensorflow::Tensor>> inputs;
+    for (int input_class = 0; input_class < (int)inputLengths_.size(); input_class++)
+    {
+      inputs.push_back({inputTensorNames_[input_class], input_classes_vector[input_class]});
+    }
+
+
     // run and measure time
-    int nRuns= nRuns_; //500
+    int nRuns = nRuns_; // default 500
     std::vector<float> runtimes;
-    int warm_up= nWarmUps_; //100
-    for(int r = 0; r < nRuns + warm_up; r++)
+    int nWarmUps = nWarmUps_; // default 50
+    for(int r = 0; r < nRuns + nWarmUps; r++)
     {
       auto start = std::chrono::high_resolution_clock::now();
-      tensorflow::run(session_, {{inputTensorName_, input}}, {outputTensorName_}, &outputs);
+      // run the graph with given inputs and outputs
+      tensorflow::run(session_, inputs, {outputTensorNames_}, &outputs);
+
       auto end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<float> runtime_in_seconds = (end - start);
 
-      if (r > warm_up)
+      if (r > nWarmUps)
       {
-        std::cout << "Current epoch: "<< r - warm_up << std::endl;
+        std::cout << "Current epoch: "<< r - nWarmUps << std::endl;
         // conver runtimes to milli seconds
         runtimes.push_back(runtime_in_seconds.count() * 1000 );
         std::cout << "Corresponding runtime: "<< runtime_in_seconds.count()*1000 << " ms" << std::endl;
@@ -206,7 +357,7 @@ void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& se
     std_runtimes.push_back(std_runtime);
 
     // save performance not divided by batch size
-    writeFile(batchsize, mean_runtime, std_runtime, filenameOutputCsv_);
+    writeFile(batchSize, mean_runtime, std_runtime, filenameOutputCsv_);
   }
 }
 
