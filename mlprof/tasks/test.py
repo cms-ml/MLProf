@@ -20,7 +20,7 @@ import subprocess
 from law.target.local import LocalFileTarget
 from mlprof.plotting.plotter import plot_batchsize
 from mlprof.tools.tools import create_corrected_cfg, all_elements_list_as_one_string, create_name_and_size_vectors
-from IPython import embed
+# from IPython import embed
 
 class TestTask(BaseTask):
     """
@@ -86,10 +86,10 @@ class RuntimeParametersTask(BaseTask):
     #                                     description="Tensorflow name of the input into the given "
     #                                     "network; default: input",
     #                                     )
-    output_tensor_name = luigi.Parameter(default="Identity",
-                                         description="Tensorflow name of the output of the given "
-                                         "network; default:Identity",
-                                         )
+    # output_tensor_name = luigi.Parameter(default="Identity",
+    #                                      description="Tensorflow name of the output of the given "
+    #                                      "network; default:Identity",
+    #                                      )
     number_runs = luigi.IntParameter(default=500,
                                      description="The number of batches to be evaluated and "
                                      "measurement averaged upon; default: 500",
@@ -108,14 +108,14 @@ class RuntimeParametersTask(BaseTask):
         default=("input:10"),
         description="the name of the input layers followed by their shapes, separated by a comma. "
         "The format is 'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'"
-        " Therefore, the name of the layer may not contain ':'. default is 'input:10'."
+        " Therefore, the name of the layer may not contain ':'. default is ('input:10')."
         )       # TODO?: Allow for input names with ":" in name???? Choose delimiter oneself?
 
-    output_shapes = law.CSVParameter(
-        default=("Identity:1"),
-        description="the name of the output layers followed by their shapes, separated by a comma. "
-        "The format is 'name_output_tensor1:first_dimension_shape-second_dim_shape,name_output_tensor2:...'"
-        " Therefore, the name of the layer may not contain ':'. default is 'output:1'."
+    output_tensor_names = law.CSVParameter(
+        default=("Identity"),
+        description="the name of the output nodes, separated by a comma. "
+        "The format is 'name_output_tensor1,name_output_tensor2...'"
+        "default is ('Identity')."
         )
 
 
@@ -136,10 +136,9 @@ class CreateConfig(RuntimeParametersTask):
                           "INPUT_FILES_PLACEHOLDER": self.input_files,
                           "INPUT_SIZE_PLACEHOLDER": self.input_sizes,
                           "INPUT_CLASS_DIMENSION_PLACEHOLDER": self.inputs_dimensions,
-                          "OUTPUT_SIZE_PLACEHOLDER": self.output_size,
                           "INPUT_TYPE_PLACEHOLDER": self.input_type,
                           "INPUT_TENSOR_NAME_PLACEHOLDER": self.input_tensor_names,
-                          "OUTPUT_TENSOR_NAME_PLACEHOLDER": self.output_tensor_name,
+                          "OUTPUT_TENSOR_NAME_PLACEHOLDER": list(self.output_tensor_names),
                           "NUMBER_RUNS_PLACEHOLDER": self.number_runs,
                           "NUMBER_WARM_UPS_PLACEHOLDER": self.number_warm_ups,
                           #"BATCH_SIZES_PLACEHOLDER": self.batch_sizes,

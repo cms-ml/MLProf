@@ -41,13 +41,11 @@ private:
   void endJob();
 
   std::vector<std::string> inputTensorNames_;
-  //std::vector<std::string> outputTensorNames_;
-  std::string outputTensorNames_;
+  std::vector<std::string> outputTensorNames_;
   std::string filenameOutputCsv_;
   std::string inputType_;
   std::vector<int> inputLengths_;
   std::vector<int> inputSizes_;
-  std::vector<int> outputSizes_;
   //std:vector batchSize_;
   int nRuns_;
   int nWarmUps_;
@@ -82,14 +80,11 @@ void MyPluginRuntime::fillDescriptions(edm::ConfigurationDescriptions& descripti
   edm::ParameterSetDescription desc;
   desc.add<std::string>("graphPath");
   desc.add<std::vector<std::string>>("inputTensorNames");
-  //desc.add<std::vector<std::string>>("outputTensorNames");
-  desc.add<std::string>("outputTensorNames");
+  desc.add<std::vector<std::string>>("outputTensorNames");
   desc.add<std::string>("filenameOutputCsv");
   desc.add<std::string>("inputType");
   desc.add<std::vector<int>>("inputLengths");
   desc.add<std::vector<int>>("inputSizes");
-  // desc.add<std::vector<int>>("outputSizes");
-  desc.add<int>("outputSizes");
   desc.add<std::vector<int>>("batchsizes");
   desc.add<int>("numberRuns");
   desc.add<int>("numberWarmUps");
@@ -98,14 +93,11 @@ void MyPluginRuntime::fillDescriptions(edm::ConfigurationDescriptions& descripti
 
 MyPluginRuntime::MyPluginRuntime(const edm::ParameterSet& config, const CacheData* cacheData)
     : inputTensorNames_(config.getParameter<std::vector<std::string>>("inputTensorNames")),
-      //outputTensorNames_(config.getParameter<std::vector<std::string>>("outputTensorNames")),
-      outputTensorNames_(config.getParameter<std::string>("outputTensorNames")),
+      outputTensorNames_(config.getParameter<std::vector<std::string>>("outputTensorNames")),
       filenameOutputCsv_(config.getParameter<std::string>("filenameOutputCsv")),
       inputType_(config.getParameter<std::string>("inputType")),
       inputLengths_(config.getParameter<std::vector<int>>("inputLengths")),
       inputSizes_(config.getParameter<std::vector<int>>("inputSizes")),
-      // outputSizes_(config.getParameter<std::vector<int>>("outputSizes")),
-      outputSizes_(config.getParameter<int>("outputSizes")),
       //batchSize_(config.getParameter<std:vector>("batchSize")),
       nRuns_(config.getParameter<int>("numberRuns")),
       nWarmUps_(config.getParameter<int>("numberWarmUps")),
@@ -330,7 +322,7 @@ void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& se
     {
       auto start = std::chrono::high_resolution_clock::now();
       // run the graph with given inputs and outputs
-      tensorflow::run(session_, inputs, {outputTensorNames_}, &outputs);
+      tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
 
       auto end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<float> runtime_in_seconds = (end - start);
