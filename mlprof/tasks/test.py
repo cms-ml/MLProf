@@ -19,8 +19,9 @@ import subprocess
 # from law.contrib.csv.formatter import PandasCsvFormatter
 from law.target.local import LocalFileTarget
 from mlprof.plotting.plotter import plot_batchsize
-from mlprof.tools.tools import create_corrected_cfg, all_elements_list_as_one_string, create_name_and_size_vectors
+from mlprof.tools.tools import create_corrected_cfg, all_elements_list_as_one_string, create_name_and_size_vectors, merge_csv_files
 # from IPython import embed
+
 
 class TestTask(BaseTask):
     """
@@ -109,26 +110,51 @@ class RuntimeParametersTask(BaseTask):
         description="the name of the input layers followed by their shapes, separated by a comma. "
         "The format is 'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'"
         " Therefore, the name of the layer may not contain ':'. default is ('input:10')."
-        )       # TODO?: Allow for input names with ":" in name???? Choose delimiter oneself?
+    )       # TODO?: Allow for input names with ":" in name???? Choose delimiter oneself?
 
     output_tensor_names = law.CSVParameter(
         default=("Identity"),
         description="the name of the output nodes, separated by a comma. "
         "The format is 'name_output_tensor1,name_output_tensor2...'"
         "default is ('Identity')."
-        )
+    )
 
 
+# class CreateConfig(RuntimeParametersTask):
+#     def output(self):
+#         return LocalFileTarget(path=os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py"))
+
+#     def run(self):
+#         if self.output_directory == law.NO_STR:
+#             self.output_directory = os.path.join(os.sep + os.path.join(*self.local_target().path.split(os.sep)[:-2]), "RuntimeMeasurement", self.version) + os.sep
+#         print(self.output_directory)
+#         self.inputs, self.input_tensor_names, self.input_sizes, self.inputs_dimensions = create_name_and_size_vectors(self.input_shapes)
+
+#         parameter_dict = {"GRAPH_PATH_PLACEHOLDER": self.graph_path,
+#                           "INPUT_FILES_PLACEHOLDER": self.input_files,
+#                           "INPUT_SIZE_PLACEHOLDER": self.input_sizes,
+#                           "INPUT_CLASS_DIMENSION_PLACEHOLDER": self.inputs_dimensions,
+#                           "INPUT_TYPE_PLACEHOLDER": self.input_type,
+#                           "INPUT_TENSOR_NAME_PLACEHOLDER": self.input_tensor_names,
+#                           "OUTPUT_TENSOR_NAME_PLACEHOLDER": list(self.output_tensor_names),
+#                           "NUMBER_RUNS_PLACEHOLDER": self.number_runs,
+#                           "NUMBER_WARM_UPS_PLACEHOLDER": self.number_warm_ups,
+#                           #"BATCH_SIZES_PLACEHOLDER": self.batch_sizes,
+#                           "OUTPUT_DIRECTORY_PLACEHOLDER": self.output_directory,
+#                           }
+#         create_corrected_cfg(os.path.join(os.environ.get("MLP_BASE"), "MLProf", "utils", "my_plugin_runtime_cfg_template.py"),
+#                          self.output().path,
+#                          parameter_dict,
+#                              )
 
 
-
-class CreateConfig(RuntimeParametersTask):
+class CreateConfigOneBatchSize(RuntimeParametersTask):
     def output(self):
         return LocalFileTarget(path=os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py"))
 
     def run(self):
         if self.output_directory == law.NO_STR:
-            self.output_directory = os.path.join(os.sep + os.path.join(*self.local_target().path.split(os.sep)[:-2]), "RuntimeMeasurement", self.version) + os.sep
+            self.output_directory = os.path.join(os.sep + os.path.join(*self.local_target().path.split(os.sep)[:-2]), "RuntimeMeasurementOneBatchSize", self.version) + os.sep
         print(self.output_directory)
         self.inputs, self.input_tensor_names, self.input_sizes, self.inputs_dimensions = create_name_and_size_vectors(self.input_shapes)
 
@@ -147,7 +173,7 @@ class CreateConfig(RuntimeParametersTask):
         create_corrected_cfg(os.path.join(os.environ.get("MLP_BASE"), "MLProf", "utils", "my_plugin_runtime_cfg_template.py"),
                          self.output().path,
                          parameter_dict,
-                         )
+                             )
 
 
 class CheckPath(BaseTask, law.tasks.RunOnceTask):
@@ -157,11 +183,12 @@ class CheckPath(BaseTask, law.tasks.RunOnceTask):
         print(os.getcwd())
         print(os.environ.get("MLP_BASE"))
         print(os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py"))
-        path=os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py")
+        path = os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py")
         with open(path, 'r') as f:
             for i, line in enumerate(f):
                 if i<5:
                     print(line)
+
 
 class RuntimeMeasurementOneBatchSize(RuntimeParametersTask):
     """
@@ -173,8 +200,10 @@ class RuntimeMeasurementOneBatchSize(RuntimeParametersTask):
                                     description="The size of the batch for which the runtime measurement is done",
                                     )
 
+    sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
+
     def requires(self):
-        return CreateConfig.req(self)
+        return CreateConfigOneBatchSize.req(self)
 
     def output(self):
         if self.output_directory != law.NO_STR:
@@ -185,22 +214,21 @@ class RuntimeMeasurementOneBatchSize(RuntimeParametersTask):
     def run(self):
         if not os.path.isdir(self.output().dirname):
             os.makedirs(self.output().dirname)
-        embed()
-        process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh")+
-                                   + " batchsizes=" + str(self.batchsize) + " filename=" + self.output.split(os.sep)[-1],
+        # embed()
+
+        process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
+                                   " batchsizes=" + str(self.batch_size) + " filename=" + self.output().path.split(os.sep)[-1],
                                shell=True,
                                stdout=None,
                                stderr=None)
         process.wait()
 
 
-
-
-class RuntimeMeasurement(RuntimeParametersTask):
+class RuntimeMeasurementSingleBatchSizes(RuntimeParametersTask):
     """
     Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
 
-    Output is the result.csv file.
+    Output is the results_batchsize_{all_batch_sizes}.csv file.
     """
 
     batch_sizes = law.CSVParameter(
@@ -210,34 +238,69 @@ class RuntimeMeasurement(RuntimeParametersTask):
         description="the different batchsizes to be tested; default: 1,2,4)",
     )
 
-    sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
-
-    # def requires(self):
-    #     return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
     def requires(self):
-        return CreateConfig.req(self)
+        return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
 
     def output(self):
         if self.output_directory != law.NO_STR:
-            return LocalFileTarget(path=os.path.join(self.output_directory, "results.csv"))
+            return LocalFileTarget(path=os.path.join(self.output_directory, "results_batchsizes" +
+                                                     all_elements_list_as_one_string(self.batch_sizes, "_") + ".csv"))
         else:
-            return self.local_target("results.csv")
+            return self.local_target("results_batchsizes" + all_elements_list_as_one_string(self.batch_sizes, "_") + ".csv")
 
     def run(self):
         if not os.path.isdir(self.output().dirname):
             os.makedirs(self.output().dirname)
-
-        batchsizes_list = list(self.batch_sizes)
-        batchsizes_argument_varparser = batchsizes_list.copy()
-        for i, batchsize in enumerate(batchsizes_argument_varparser):
-            batchsizes_argument_varparser[i] = "batchsizes=" + str(batchsize)
         # embed()
-        process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
-                                   all_elements_list_as_one_string(batchsizes_argument_varparser),
-                                   shell=True,
-                                   stdout=None,
-                                   stderr=None)
-        process.wait()
+        # implement merging csv files here
+        input_paths = []
+        for input_target in self.input():
+            input_paths = input_paths + [input_target.path]
+        merge_csv_files(input_paths, self.output().path)
+
+
+# class RuntimeMeasurement(RuntimeParametersTask):
+#     """
+#     Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
+
+#     Output is the result.csv file.
+#     """
+
+#     batch_sizes = law.CSVParameter(
+#         cls=luigi.IntParameter,
+#         default=(1, 2, 4),
+#         max_len=20,
+#         description="the different batchsizes to be tested; default: 1,2,4)",
+#     )
+
+#     sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
+
+#     # def requires(self):
+#     #     return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
+#     def requires(self):
+#         return CreateConfig.req(self)
+
+#     def output(self):
+#         if self.output_directory != law.NO_STR:
+#             return LocalFileTarget(path=os.path.join(self.output_directory, "results.csv"))
+#         else:
+#             return self.local_target("results.csv")
+
+#     def run(self):
+#         if not os.path.isdir(self.output().dirname):
+#             os.makedirs(self.output().dirname)
+
+#         batchsizes_list = list(self.batch_sizes)
+#         batchsizes_argument_varparser = batchsizes_list.copy()
+#         for i, batchsize in enumerate(batchsizes_argument_varparser):
+#             batchsizes_argument_varparser[i] = "batchsizes=" + str(batchsize)
+#         # embed()
+#         process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
+#                                    all_elements_list_as_one_string(batchsizes_argument_varparser, " "),
+#                                    shell=True,
+#                                    stdout=None,
+#                                    stderr=None)
+#         process.wait()
 
 
 class RuntimePlotterTask(RuntimeParametersTask, law.tasks.RunOnceTask):
@@ -245,28 +308,30 @@ class RuntimePlotterTask(RuntimeParametersTask, law.tasks.RunOnceTask):
     Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
     default are 1, 2 and 4.
     """
-    number_runs = RuntimeMeasurement.number_runs
+    # number_runs = RuntimeMeasurementSingleBatchSizes.number_runs
     output_directory_plot = luigi.Parameter(default=law.NO_STR,
                                        description="The path to the folder to save the pdf file "
                                        "with the plots called runtime_plot_different_batchsizes.pdf, "
                                        "standard law path will be used if value "
                                        "is law.NO_STR; default:law.NO_STR",
                                             )
-    output_directory = RuntimeMeasurement.output_directory
-    batch_sizes = RuntimeMeasurement.batch_sizes
+    # output_directory = RuntimeMeasurementSingleBatchSizes.output_directory
+    batch_sizes = RuntimeMeasurementSingleBatchSizes.batch_sizes
 
     def requires(self):
-        return RuntimeMeasurement.req(self)
+        return RuntimeMeasurementSingleBatchSizes.req(self)
 
     def output(self):
         if self.output_directory_plot != law.NO_STR:
             return LocalFileTarget(path=os.path.join(self.output_directory_plot,
-                                                     "runtime_plot_different_batchsizes.pdf"))
+                                                     "runtime_plot_different_batchsizes" +
+                                                     all_elements_list_as_one_string(self.batch_sizes, "_") + ".pdf"))
         else:
-            return self.local_target("runtime_plot_different_batchsizes.pdf")
+            return self.local_target("runtime_plot_different_batchsizes" + all_elements_list_as_one_string(self.batch_sizes, "_") + ".pdf")
 
     def run(self):
         if not os.path.isdir(self.output().dirname):
             os.makedirs(self.output().dirname)
+        # embed()
         plot_batchsize(np.array(self.batch_sizes), self.number_runs, self.input().path, self.output().path)
         print("plot saved")

@@ -44,13 +44,12 @@ process.options = cms.untracked.PSet(
 process.load("MLProf.RuntimeModule.myPluginRuntime_cfi")
 process.myPluginRuntime.graphPath = cms.string(data)
 process.myPluginRuntime.inputTensorNames = cms.vstring(['input_0'])
-process.myPluginRuntime.outputTensorNames = cms.string("Identity")
-process.myPluginRuntime.filenameOutputCsv = cms.string("/afs/desy.de/user/p/prouvost/xxl/af-cms/MLProf/data/RuntimeMeasurement/test_simple_dnn_workflow/" + options.filename)
+process.myPluginRuntime.outputTensorNames = cms.vstring(['Identity'])
+process.myPluginRuntime.filenameOutputCsv = cms.string("/afs/desy.de/user/p/prouvost/xxl/af-cms/MLProf/data/RuntimeMeasurementOneBatchSize/test_simple_dnn_workflow/" + options.filename)
 process.myPluginRuntime.inputType = cms.string("random")
-# add untracked?
+
 process.myPluginRuntime.inputSizes = cms.vint32([784])
 process.myPluginRuntime.inputLengths = cms.vint32([1])
-process.myPluginRuntime.outputSizes = cms.int32(1)
 process.myPluginRuntime.numberRuns = cms.int32(500)
 process.myPluginRuntime.numberWarmUps = cms.int32(50)
 #process.myPluginRuntime.batchsizes = cms.vint32(BATCH_SIZES_PLACEHOLDER)
