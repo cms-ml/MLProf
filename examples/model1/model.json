@@ -1,4 +1,14 @@
 {
-    "model_file": "/afs/public/....",
-
+    "file": "/afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb",
+    "inputs": [
+        {
+            "name": "input_0",
+            "shape": [784]
+        }
+    ],
+    "outputs": [
+        {
+            "name": "Identity"
+        }
+    ]
 }
