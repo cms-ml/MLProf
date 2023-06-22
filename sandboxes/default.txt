@@ -1,4 +1,4 @@
-# version 2
+# version 4
 
 luigi==3.1.*
 pyyaml==6.*
@@ -6,3 +6,7 @@ ipython==7.16.*
 flake8==4.0.*
 flake8-commas==2.1.*
 flake8-quotes==3.3.*
+pandas>=1.0
+numpy>=1.0
+matplotlib>=3.0
+mplhep==0.2.18
