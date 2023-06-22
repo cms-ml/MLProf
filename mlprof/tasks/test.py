@@ -5,22 +5,24 @@ Collection of test tasks.
 """
 
 import os
+import subprocess
 
 import luigi
 import law
-
-from mlprof.tasks.base import BaseTask
-
+from law.target.local import LocalFileTarget
 # import pandas as pd
 # import matplotlib.pyplot as plt
-import numpy as np
-import subprocess
-# from law.contrib.matplotlib.formatter import MatplotlibFormatter
-# from law.contrib.csv.formatter import PandasCsvFormatter
-from law.target.local import LocalFileTarget
+
+from mlprof.tasks.base import BaseTask
 from mlprof.plotting.plotter import plot_batchsize
-from mlprof.tools.tools import create_corrected_cfg, all_elements_list_as_one_string, create_name_and_size_vectors, merge_csv_files
-from IPython import embed
+from mlprof.tools.tools import (
+    create_corrected_cfg,
+    all_elements_list_as_one_string,
+    create_name_and_size_vectors,
+    merge_csv_files,
+)
+
+# from IPython import embed
 
 
 class TestTask(BaseTask):
@@ -314,6 +316,8 @@ class RuntimePlotterTask(RuntimeParametersTask, law.tasks.RunOnceTask):
             return self.local_target("runtime_plot_different_batchsizes" + all_elements_list_as_one_string(self.batch_sizes, "_") + ".pdf")
 
     def run(self):
+        import numpy as np
+
         if not os.path.isdir(self.output().dirname):
             os.makedirs(self.output().dirname)
         # embed()

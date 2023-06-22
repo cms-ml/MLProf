@@ -25,7 +25,7 @@ setup_mlp() {
     export MLP_SOFTWARE_BASE="${MLP_SOFTWARE_BASE:-${MLP_DATA_BASE}/software}"
     export MLP_VENV_BASE="${MLP_VENV_BASE:-${MLP_SOFTWARE_BASE}/venvs}"
     export MLP_CMSSW_BASE="${MLP_CMSSW_BASE:-${MLP_SOFTWARE_BASE}/cmssw}"
-    export MLP_STORE_LOCAL="${MLP_STORE_LOCAL:-${MLP_DATA_BASE/store}}"
+    export MLP_STORE_LOCAL="${MLP_STORE_LOCAL:-${MLP_DATA_BASE}/store}"
     export MLP_LOCAL_SCHEDULER="${MLP_LOCAL_SCHEDULER:-true}"
     export MLP_SCHEDULER_HOST="${MLP_SCHEDULER_HOST:-127.0.0.1}"
     export MLP_SCHEDULER_PORT="${MLP_SCHEDULER_PORT:-8082}"
@@ -96,7 +96,6 @@ setup_mlp() {
     # law setup
     #
 
-
     export LAW_HOME="${MLP_BASE}/.law"
     export LAW_CONFIG_FILE="${MLP_BASE}/law.cfg"
 
@@ -104,12 +103,8 @@ setup_mlp() {
         # source law's bash completion scipt
         source "$( law completion )" ""
 
-        # echo "after source completion"
-
         # silently index
         law index -q
-
-        # echo "after law index -q"
     fi
 
 }

@@ -1,4 +1,4 @@
-import pandas as pd
+# coding: utf-8
 
 
 def all_elements_list_as_one_string(some_string_list, delimiter):
@@ -50,6 +50,8 @@ def create_name_and_size_vectors(inputs):
 
 
 def merge_csv_files(input_paths, output_path):
+    import pandas as pd
+
     dataset_list = []
     for input_path in input_paths:
         pd_dataset = pd.read_csv(input_path, delimiter=",", names=["batch_size", "mean", "std"])

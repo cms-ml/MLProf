@@ -95,34 +95,89 @@ class CommandTask(BaseTask):
     run_command_in_tmp = False
 
     def _print_command(self, args):
+        from law.task.interactive import fmt_chars, _print_wrapped
+        from law.util import colored, get_terminal_width
+
         max_depth = int(args[0])
 
-        print(f"print task commands with max_depth {max_depth}")
+        print("print task commands with max_depth {}".format(max_depth))
+        print("")
 
-        for dep, _, depth in self.walk_deps(max_depth=max_depth, order="pre"):
-            offset = depth * ("|" + law.task.interactive.ind)
-            print(offset)
+        # get the format chars
+        fmt_name = law.config.get_expanded("task", "interactive_format")
+        fmt = fmt_chars.get(fmt_name, fmt_chars["fancy"])
 
-            print("{}> {}".format(offset, dep.repr(color=True)))
-            offset += "|" + law.task.interactive.ind
+        # get the line break setting
+        break_lines = law.config.get_expanded_bool("task", "interactive_line_breaks")
+        out_width = law.config.get_expanded_int("task", "interactive_line_width")
+        print_width = (out_width if out_width > 0 else get_terminal_width()) if break_lines else None
+        _print = lambda line, offset, br=1: _print_wrapped(line, print_width if br else None, offset)
 
-            if isinstance(dep, CommandTask):
-                # when dep is a workflow, take the first branch
-                text = law.util.colored("command", style="bright")
-                if isinstance(dep, law.BaseWorkflow) and dep.is_workflow():
-                    dep = dep.as_branch(0)
-                    text += " (from branch {})".format(law.util.colored("0", "red"))
-                text += ": "
+        # walk through deps
+        parents_last_flags = []
+        for dep, next_deps, depth, is_last in self.walk_deps(
+            max_depth=max_depth,
+            order="pre",
+            yield_last_flag=True,
+        ):
+            del parents_last_flags[depth:]
+            next_deps_shown = bool(next_deps) and (max_depth < 0 or depth < max_depth)
 
-                cmd = dep.build_command()
-                if cmd:
-                    cmd = law.util.quote_cmd(cmd) if isinstance(cmd, (list, tuple)) else cmd
-                    text += law.util.colored(cmd, "cyan")
+            # determine the print common offset
+            offset = [(" " if f else fmt["|"]) + fmt["ind"] * " " for f in parents_last_flags[1:]]
+            offset = "".join(offset)
+            parents_last_flags.append(is_last)
+
+            # print free space
+            free_offset = offset + fmt["|"]
+            free_lines = "\n".join(fmt["free"] * [free_offset])
+            if depth > 0 and free_lines:
+                print(free_lines)
+
+            # determine task offset and prefix
+            task_offset = offset
+            if depth > 0:
+                task_offset += fmt["l" if is_last else "t"] + fmt["ind"] * fmt["-"]
+            task_prefix = "{} {} ".format(depth, fmt[">"])
+
+            # determine text offset and prefix
+            text_offset = offset
+            if depth > 0:
+                text_offset += (" " if is_last else fmt["|"]) + fmt["ind"] * " "
+            text_prefix = (len(task_prefix) - 1) * " "
+            text_offset += (fmt["|"] if next_deps_shown else " ") + text_prefix
+            text_offset_ind = text_offset + fmt["ind"] * " "
+
+            # print the task line
+            _print(task_offset + task_prefix + dep.repr(color=True), text_offset)
+
+            # stop when dep has no command
+            if not isinstance(dep, CommandTask):
+                _print(text_offset_ind + colored("not a CommandTask", "yellow"), text_offset_ind)
+                continue
+
+            # when dep is a workflow, take the first branch
+            text = law.util.colored("command", style="bright")
+            if isinstance(dep, law.BaseWorkflow) and dep.is_workflow():
+                dep = dep.as_branch(0)
+                text += " (from branch {})".format(law.util.colored("0", "red"))
+            text += ": "
+
+            cmd = dep.get_command(fallback_level=0)
+            if cmd:
+                # when cmd is a 2-tuple, i.e. the real command and a representation for printing
+                # pick the second one
+                if isinstance(cmd, tuple) and len(cmd) == 2:
+                    cmd = cmd[1]
                 else:
-                    text += law.util.colored("empty", "red")
-                print(offset + text)
+                    if isinstance(cmd, list):
+                        cmd = law.util.quote_cmd(cmd)
+                    # defaut highlighting
+                    cmd = law.util.colored(cmd, "cyan")
+                text += cmd
             else:
-                print(offset + law.util.colored("not a CommandTask", "yellow"))
+                text += law.util.colored("empty", "red")
+            _print(text_offset_ind + text, text_offset_ind, br=False)
 
     def build_command(self):
         # this method should build and return the command to run
