@@ -28,10 +28,10 @@ process = cms.Process("TEST")
 # minimal configuration
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
-process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(10))
+process.maxEvents = cms.untracked.PSet(input=cms.untracked.int32(NUMBER_EVENTS_TAKEN))
 process.source = cms.Source(
     "PoolSource",
-    fileNames=cms.untracked.vstring("file://" + "INPUT_FILES_PLACEHOLDER"),
+    fileNames=cms.untracked.vstring(*INPUT_FILES_PLACEHOLDER),
 )
 
 # process options

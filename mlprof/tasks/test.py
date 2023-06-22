@@ -20,7 +20,7 @@ import subprocess
 from law.target.local import LocalFileTarget
 from mlprof.plotting.plotter import plot_batchsize
 from mlprof.tools.tools import create_corrected_cfg, all_elements_list_as_one_string, create_name_and_size_vectors, merge_csv_files
-# from IPython import embed
+from IPython import embed
 
 
 class TestTask(BaseTask):
@@ -67,22 +67,28 @@ class RuntimeParametersTask(BaseTask):
                                 description="path of the graph to be tested; "
                                 "default: /afs/cern.ch/user/n/nprouvos/public/graph.pb",
                                  )
-    input_files = luigi.Parameter(default="/afs/cern.ch/user/n/nprouvos/public/testfile.root",
+    input_files = law.CSVParameter(cls=luigi.Parameter,
+                                 default="/afs/cern.ch/user/n/nprouvos/public/testfile.root",
                                  description="the absolute path of the input files in root format "
-                                 "to be openened in CMSSW, might not be used for the input values, "
+                                 "to be opened in CMSSW, needed by cmsRun, but might not be used for the input values, "
                                  "depending on the input type argument; "
                                  "default: /afs/cern.ch/user/n/nprouvos/public/testfile.root",
-                                  )
+                                   )
+    number_events = luigi.IntParameter(default=10,
+                                       description="The number of events to take from the input files "
+                                       "for the inference.",
+                                       )
     # input_sizes = luigi.IntParameter(default=10,
     #                                 description="The size of the input tensor in the network; default: 10",
     #                                 )
-    output_size = luigi.IntParameter(default=1,
-                                     description="The size of the output tensor of the network; default: 1",
-                                     )
-    input_type = luigi.Parameter(default="random",
+    # output_size = luigi.IntParameter(default=1,
+    #                                  description="The size of the output tensor of the network; default: 1",
+    #                                  )
+    input_type = luigi.ChoiceParameter(choices=["random", "incremental"], var_type=str,
+                                default="random",
                                 description="Type of input values to be used, either random or incremental "
                                 "(custom type to be added?); default: random",
-                                 )
+                                       )
     # input_tensor_names = luigi.Parameter(default="input",
     #                                     description="Tensorflow name of the input into the given "
     #                                     "network; default: input",
@@ -120,35 +126,7 @@ class RuntimeParametersTask(BaseTask):
     )
 
 
-# class CreateConfig(RuntimeParametersTask):
-#     def output(self):
-#         return LocalFileTarget(path=os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py"))
-
-#     def run(self):
-#         if self.output_directory == law.NO_STR:
-#             self.output_directory = os.path.join(os.sep + os.path.join(*self.local_target().path.split(os.sep)[:-2]), "RuntimeMeasurement", self.version) + os.sep
-#         print(self.output_directory)
-#         self.inputs, self.input_tensor_names, self.input_sizes, self.inputs_dimensions = create_name_and_size_vectors(self.input_shapes)
-
-#         parameter_dict = {"GRAPH_PATH_PLACEHOLDER": self.graph_path,
-#                           "INPUT_FILES_PLACEHOLDER": self.input_files,
-#                           "INPUT_SIZE_PLACEHOLDER": self.input_sizes,
-#                           "INPUT_CLASS_DIMENSION_PLACEHOLDER": self.inputs_dimensions,
-#                           "INPUT_TYPE_PLACEHOLDER": self.input_type,
-#                           "INPUT_TENSOR_NAME_PLACEHOLDER": self.input_tensor_names,
-#                           "OUTPUT_TENSOR_NAME_PLACEHOLDER": list(self.output_tensor_names),
-#                           "NUMBER_RUNS_PLACEHOLDER": self.number_runs,
-#                           "NUMBER_WARM_UPS_PLACEHOLDER": self.number_warm_ups,
-#                           #"BATCH_SIZES_PLACEHOLDER": self.batch_sizes,
-#                           "OUTPUT_DIRECTORY_PLACEHOLDER": self.output_directory,
-#                           }
-#         create_corrected_cfg(os.path.join(os.environ.get("MLP_BASE"), "MLProf", "utils", "my_plugin_runtime_cfg_template.py"),
-#                          self.output().path,
-#                          parameter_dict,
-#                              )
-
-
-class CreateConfigOneBatchSize(RuntimeParametersTask):
+class CreateConfigRuntime(RuntimeParametersTask):
     def output(self):
         return LocalFileTarget(path=os.path.join(os.environ.get("MLP_BASE"), "MLProf", "RuntimeModule", "test", "my_plugin_runtime_cfg.py"))
 
@@ -157,9 +135,12 @@ class CreateConfigOneBatchSize(RuntimeParametersTask):
             self.output_directory = os.path.join(os.sep + os.path.join(*self.local_target().path.split(os.sep)[:-2]), "RuntimeMeasurementOneBatchSize", self.version) + os.sep
         print(self.output_directory)
         self.inputs, self.input_tensor_names, self.input_sizes, self.inputs_dimensions = create_name_and_size_vectors(self.input_shapes)
-
+        filenames_list = list(self.input_files)
+        for ifile, filename in enumerate(filenames_list):
+            filenames_list[ifile] = "file://" + filename
         parameter_dict = {"GRAPH_PATH_PLACEHOLDER": self.graph_path,
-                          "INPUT_FILES_PLACEHOLDER": self.input_files,
+                          "INPUT_FILES_PLACEHOLDER": filenames_list,
+                          "NUMBER_EVENTS_TAKEN": self.number_events,
                           "INPUT_SIZE_PLACEHOLDER": self.input_sizes,
                           "INPUT_CLASS_DIMENSION_PLACEHOLDER": self.inputs_dimensions,
                           "INPUT_TYPE_PLACEHOLDER": self.input_type,
@@ -174,6 +155,7 @@ class CreateConfigOneBatchSize(RuntimeParametersTask):
                          self.output().path,
                          parameter_dict,
                              )
+
 
 
 class CheckPath(BaseTask, law.tasks.RunOnceTask):
@@ -203,7 +185,7 @@ class RuntimeMeasurementOneBatchSize(RuntimeParametersTask):
     sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
 
     def requires(self):
-        return CreateConfigOneBatchSize.req(self)
+        return CreateConfigRuntime.req(self)
 
     def output(self):
         if self.output_directory != law.NO_STR:
@@ -224,9 +206,10 @@ class RuntimeMeasurementOneBatchSize(RuntimeParametersTask):
         process.wait()
 
 
-class RuntimeMeasurementSingleBatchSizes(RuntimeParametersTask):
+class RuntimeMeasurement(RuntimeParametersTask):
     """
     Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
+    This task merges the results from the several occurences of RuntimeMeasurementOneBatchSize.
 
     Output is the results_batchsize_{all_batch_sizes}.csv file.
     """
@@ -234,8 +217,8 @@ class RuntimeMeasurementSingleBatchSizes(RuntimeParametersTask):
     batch_sizes = law.CSVParameter(
         cls=luigi.IntParameter,
         default=(1, 2, 4),
-        max_len=20,
-        description="the different batchsizes to be tested; default: 1,2,4)",
+        # max_len=20,
+        description="the different batchsizes to be tested; default: (1,2,4)",
     )
 
     def requires(self):
@@ -278,7 +261,7 @@ class RuntimeMeasurementSingleBatchSizes(RuntimeParametersTask):
 #     # def requires(self):
 #     #     return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
 #     def requires(self):
-#         return CreateConfig.req(self)
+#         return CreateConfigRuntime.req(self)
 
 #     def output(self):
 #         if self.output_directory != law.NO_STR:
@@ -294,6 +277,7 @@ class RuntimeMeasurementSingleBatchSizes(RuntimeParametersTask):
 #         batchsizes_argument_varparser = batchsizes_list.copy()
 #         for i, batchsize in enumerate(batchsizes_argument_varparser):
 #             batchsizes_argument_varparser[i] = "batchsizes=" + str(batchsize)
+
 #         # embed()
 #         process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
 #                                    all_elements_list_as_one_string(batchsizes_argument_varparser, " "),
@@ -308,7 +292,7 @@ class RuntimePlotterTask(RuntimeParametersTask, law.tasks.RunOnceTask):
     Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
     default are 1, 2 and 4.
     """
-    # number_runs = RuntimeMeasurementSingleBatchSizes.number_runs
+    # number_runs = RuntimeMeasurement.number_runs
     output_directory_plot = luigi.Parameter(default=law.NO_STR,
                                        description="The path to the folder to save the pdf file "
                                        "with the plots called runtime_plot_different_batchsizes.pdf, "
@@ -316,10 +300,10 @@ class RuntimePlotterTask(RuntimeParametersTask, law.tasks.RunOnceTask):
                                        "is law.NO_STR; default:law.NO_STR",
                                             )
     # output_directory = RuntimeMeasurementSingleBatchSizes.output_directory
-    batch_sizes = RuntimeMeasurementSingleBatchSizes.batch_sizes
+    batch_sizes = RuntimeMeasurement.batch_sizes
 
     def requires(self):
-        return RuntimeMeasurementSingleBatchSizes.req(self)
+        return RuntimeMeasurement.req(self)
 
     def output(self):
         if self.output_directory_plot != law.NO_STR:
