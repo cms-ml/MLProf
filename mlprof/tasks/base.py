@@ -46,7 +46,7 @@ class BaseTask(law.SandboxTask):
         and *path* and returns the joined path.
         """
         # determine the main store directory
-        store = os.environ["MLP_STORE_LOCAL"]
+        store = "$MLP_STORE_LOCAL"
 
         # concatenate all parts that make up the path and join them
         parts = tuple(self.store_parts().values()) + path

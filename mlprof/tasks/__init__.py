@@ -4,4 +4,4 @@ import law
 
 
 # enable contrib packages
-law.contrib.load("tasks")
+law.contrib.load("cms", "tasks")
