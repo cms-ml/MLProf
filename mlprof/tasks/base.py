@@ -9,6 +9,8 @@ import os
 import luigi
 import law
 
+from collections import OrderedDict
+
 
 class BaseTask(law.SandboxTask):
 
@@ -163,7 +165,7 @@ class CommandTask(BaseTask):
                 text += " (from branch {})".format(law.util.colored("0", "red"))
             text += ": "
 
-            cmd = dep.get_command(fallback_level=0)
+            cmd = dep.build_command()
             if cmd:
                 # when cmd is a 2-tuple, i.e. the real command and a representation for printing
                 # pick the second one
@@ -246,3 +248,78 @@ class CommandTask(BaseTask):
 
     def post_run_command(self):
         return
+
+
+class PlotTask(BaseTask):
+
+    file_types = law.CSVParameter(
+        default=("pdf",),
+        description="comma-separated types of the output plot files; default: pdf",
+    )
+    plot_postfix = luigi.Parameter(
+        default=law.NO_STR,
+        description="an arbitrary postfix that is added with two underscores to all paths of "
+        "produced plots; default: empty",
+    )
+    view_cmd = luigi.Parameter(
+        default=law.NO_STR,
+        significant=False,
+        description="a command to execute after the task has run to visualize plots right in the "
+        "terminal; default: empty",
+    )
+
+    def create_plot_names(self, parts):
+        plot_file_types = ["pdf", "png", "root", "c", "eps"]
+        if any(t not in plot_file_types for t in self.file_types):
+            raise Exception("plot names only allowed for file types {}, got {}".format(
+                ",".join(plot_file_types), ",".join(self.file_types),
+            ))
+
+        if self.plot_postfix and self.plot_postfix != law.NO_STR:
+            parts.append((self.plot_postfix,))
+
+        name = "__".join(map(str, parts))
+        return [f"{name}.{t}" for t in self.file_types]
+
+
+@law.decorator.factory(accept_generator=True)
+def view_output_plots(fn, opts, task, *args, **kwargs):
+    def before_call():
+        return None
+
+    def call(state):
+        return fn(task, *args, **kwargs)
+
+    def after_call(state):
+        view_cmd = getattr(task, "view_cmd", None)
+        if not view_cmd or view_cmd == law.NO_STR:
+            return
+
+        # prepare the view command
+        if "{}" not in view_cmd:
+            view_cmd += " {}"
+
+        # collect all paths to view
+        view_targets = OrderedDict()
+        outputs = law.util.flatten(task.output())
+        while outputs:
+            output = outputs.pop(0)
+            if isinstance(output, law.TargetCollection):
+                outputs.extend(output._flat_target_list)
+                continue
+            if not getattr(output, "path", None):
+                continue
+            if output.path.endswith((".pdf", ".png")) and output.uri() not in view_targets:
+                view_targets[output.uri()] = output
+
+        # loop through targets and view them
+        for target in view_targets.values():
+            task.publish_message("showing {}".format(target.path))
+            with target.localize("r") as tmp:
+                law.util.interruptable_popen(
+                    view_cmd.format(tmp.path),
+                    shell=True,
+                    executable="/bin/bash",
+                )
+
+    return before_call, call, after_call

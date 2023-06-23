@@ -49,7 +49,7 @@ private:
   //std:vector batchSize_;
   int nRuns_;
   int nWarmUps_;
-  std::vector<int> batchsizes_;
+  std::vector<int> batchSizes_;
 
   tensorflow::Session* session_;
 };
@@ -85,7 +85,7 @@ void MyPluginRuntime::fillDescriptions(edm::ConfigurationDescriptions& descripti
   desc.add<std::string>("inputType");
   desc.add<std::vector<int>>("inputLengths");
   desc.add<std::vector<int>>("inputSizes");
-  desc.add<std::vector<int>>("batchsizes");
+  desc.add<std::vector<int>>("batchSizes");
   desc.add<int>("numberRuns");
   desc.add<int>("numberWarmUps");
   descriptions.addWithDefaultLabel(desc);
@@ -101,7 +101,7 @@ MyPluginRuntime::MyPluginRuntime(const edm::ParameterSet& config, const CacheDat
       //batchSize_(config.getParameter<std:vector>("batchSize")),
       nRuns_(config.getParameter<int>("numberRuns")),
       nWarmUps_(config.getParameter<int>("numberWarmUps")),
-      batchsizes_(config.getParameter<std::vector<int>>("batchsizes")),
+      batchSizes_(config.getParameter<std::vector<int>>("batchSizes")),
       session_(tensorflow::createSession(cacheData->graphDef)) {}
 
 void MyPluginRuntime::beginJob() {}
@@ -187,12 +187,9 @@ std::vector<int> get_tensor_shape(tensorflow::Tensor& tensor)
 
 
 void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& setup) {
-  std::vector<int> batchSizes = batchsizes_;
-  print_vector(batchsizes_);
-  print_vector(batchSizes);
   std::list<float> mean_runtimes;
   std::list<float> std_runtimes;
-  for (int batchSize : batchSizes)
+  for (int batchSize : batchSizes_)
   {
     std::random_device rd;
     std::default_random_engine generator(rd());

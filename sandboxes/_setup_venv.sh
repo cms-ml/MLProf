@@ -30,7 +30,7 @@ setup_venv() {
 
     # split $MLP_VENV_REQUIREMENTS into an array
     local requirement_files
-    local requirement_files_contains_default="false"
+    local requirement_files_contains_base="false"
     if ${shell_is_zsh}; then
         requirement_files=(${(@s:,:)MLP_VENV_REQUIREMENTS})
     else
@@ -41,8 +41,8 @@ setup_venv() {
             >&2 echo "requirement file '${f}' does not exist"
             return "3"
         fi
-        if [ "${f}" = "${MLP_BASE}/sandboxes/default.txt" ]; then
-            requirement_files_contains_default="true"
+        if [ "${f}" = "${MLP_BASE}/sandboxes/base.txt" ]; then
+            requirement_files_contains_base="true"
         fi
     done
     local i0="$( ${shell_is_zsh} && echo "1" || echo "0" )"
@@ -117,10 +117,10 @@ setup_venv() {
         echo -e "\n\x1b[0;49;35mupdating pip\x1b[0m"
         python3 -m pip install -U pip || ( rm -f "${pending_flag_file}" && return "13" )
 
-        # install basic production requirements
-        if ! ${requirement_files_contains_default}; then
-            echo -e "\n\x1b[0;49;35minstalling requirement file ${MLP_BASE}/sandboxes/default.txt\x1b[0m"
-            python3 -m pip install -r "${MLP_BASE}/sandboxes/default.txt" || ( rm -f "${pending_flag_file}" && return "14" )
+        # install basoc production requirements
+        if ! ${requirement_files_contains_base}; then
+            echo -e "\n\x1b[0;49;35minstalling requirement file ${MLP_BASE}/sandboxes/base.txt\x1b[0m"
+            python3 -m pip install -r "${MLP_BASE}/sandboxes/base.txt" || ( rm -f "${pending_flag_file}" && return "14" )
         fi
 
         # install requirement files

@@ -7,7 +7,7 @@ action() {
 
     # set variables and source the generic venv setup
     export MLP_VENV_NAME="$( basename "${this_file%.sh}" )"
-    export MLP_VENV_REQUIREMENTS="${this_dir}/default.txt"
+    export MLP_VENV_REQUIREMENTS="${this_dir}/base.txt"
 
     source "${this_dir}/_setup_venv.sh" "$@"
 }

@@ -5,18 +5,19 @@ Collection of test tasks.
 """
 
 import os
-import subprocess
 
 import luigi
 import law
-from law.target.local import LocalFileTarget
 
-from mlprof.tasks.base import BaseTask
+from mlprof.tasks.base import BaseTask, CommandTask, PlotTask, view_output_plots
 from mlprof.plotting.plotter import plot_batchsize
-from mlprof.tools.tools import all_elements_list_as_one_string, merge_csv_files
 
 
 class CMSSWParameters(BaseTask):
+    """
+    TODO:
+        - move to base (or even better: a different name)
+    """
 
     cmssw_version = luigi.Parameter(
         default="CMSSW_12_2_4",
@@ -40,10 +41,21 @@ class CMSSWParameters(BaseTask):
 
 
 class CMSSWSandboxTask(CMSSWParameters):
+    """
+    TODO:
+        - move to base (or even better: a different name)
+    """
 
     @property
     def sandbox(self):
-        return f"cmssw::{self.cmssw_version}::arch={self.scram_arch}"
+        parts = [
+            "cmssw",
+            self.cmssw_version,
+            f"arch={self.scram_arch}",
+            "setup=$MLP_BASE/cmssw/install_sandbox.sh",
+            "dir=$MLP_CMSSW_BASE",
+        ]
+        return "::".join(parts)
 
 
 class RuntimeParameters(BaseTask):
@@ -111,7 +123,29 @@ class RuntimeParameters(BaseTask):
         return parts
 
 
+class BatchSizesParameters(BaseTask):
+    """
+    TODO:
+        - move to base (or even better: a different name)
+    """
+
+    batch_sizes = law.CSVParameter(
+        cls=luigi.IntParameter,
+        default=(1, 2, 4),
+        sort=True,
+        description="comma-separated list of batch sizes to be tested; default: 1,2,4",
+    )
+
+    @property
+    def batch_sizes_repr(self):
+        return "_".join(map(str, self.batch_sizes))
+
+
 class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
+    """
+    TODO:
+        - rename template vars
+    """
 
     default_cmssw_files = {
         "CMSSW_*": ["/afs/cern.ch/user/n/nprouvos/public/testfile.root"],
@@ -166,8 +200,8 @@ class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
         }
 
         # load the template content
-        template = law.LocalFileTarget("$MLP_BASE/MLProf/RuntimeModule/test/runtime_template_cfg.py")
-        content = template.load(formatter="text")
+        template = "$MLP_BASE/cmssw/MLProf/RuntimeModule/test/runtime_template_cfg.py"
+        content = law.LocalFileTarget(template).load(formatter="text")
 
         # replace variables
         for key, value in template_vars.items():
@@ -177,169 +211,82 @@ class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
         output.dump(content, formatter="text")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class RuntimeMeasurementOneBatchSize(RuntimeParameters):
+class MeasureRuntime(CommandTask, RuntimeParameters, CMSSWSandboxTask):
     """
-    Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
-    and a single batch size
+    Task to provide the time measurements of the inference of a network in cmssw, given the input
+    parameters and a single batch size
 
-    Output is a result_batch_size_{batch_size}.csv file. """
-    batch_size = luigi.IntParameter(default=1,
-                                    description="The size of the batch for which the runtime measurement is done",
-                                    )
-
-    sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
-
-    def requires(self):
-        return CreateConfigRuntime.req(self)
-
-    def output(self):
-        if self.output_directory != law.NO_STR:
-            return LocalFileTarget(path=os.path.join(self.output_directory, "results_batch_size_{}.csv".format(self.batch_size)))
-        else:
-            return self.local_target("results_batch_size_{}.csv".format(self.batch_size))
-
-    def run(self):
-        if not os.path.isdir(self.output().dirname):
-            os.makedirs(self.output().dirname)
-        # embed()
-
-        process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
-                                   " batchsizes=" + str(self.batch_size) + " filename=" + self.output().path.split(os.sep)[-1],
-                               shell=True,
-                               stdout=None,
-                               stderr=None)
-        process.wait()
-
-
-class RuntimeMeasurement(RuntimeParameters):
-    """
-    Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
-    This task merges the results from the several occurences of RuntimeMeasurementOneBatchSize.
-
-    Output is the results_batchsize_{all_batch_sizes}.csv file.
+    Output is a result_batch_size_{batch_size}.csv file.
     """
 
-    batch_sizes = law.CSVParameter(
-        cls=luigi.IntParameter,
-        default=(1, 2, 4),
-        # max_len=20,
-        description="the different batchsizes to be tested; default: (1,2,4)",
+    batch_size = luigi.IntParameter(
+        default=1,
+        description="the batch size to measure the runtime for; default: 1",
     )
 
     def requires(self):
-        return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
+        return CreateRuntimeConfig.req(self)
 
     def output(self):
-        if self.output_directory != law.NO_STR:
-            return LocalFileTarget(path=os.path.join(self.output_directory, "results_batchsizes" +
-                                                     all_elements_list_as_one_string(self.batch_sizes, "_") + ".csv"))
-        else:
-            return self.local_target("results_batchsizes" + all_elements_list_as_one_string(self.batch_sizes, "_") + ".csv")
+        return self.local_target(f"runtime_bs_{self.batch_size}.csv")
+
+    def build_command(self):
+        return [
+            "cmsRun",
+            self.input().path,
+            f"batchSizes={self.batch_size}",
+            f"csvFile={self.output().path}",
+        ]
+
+
+class MergeRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters):
+
+    def requires(self):
+        return [
+            MeasureRuntime.req(self, batch_size=batch_size)
+            for batch_size in self.batch_sizes
+        ]
+
+    def output(self):
+        return self.local_target(f"runtimes_bs_{self.batch_sizes_repr}.csv")
 
     def run(self):
-        if not os.path.isdir(self.output().dirname):
-            os.makedirs(self.output().dirname)
-        # embed()
-        # implement merging csv files here
-        input_paths = []
-        for input_target in self.input():
-            input_paths = input_paths + [input_target.path]
-        merge_csv_files(input_paths, self.output().path)
+        # merge files
+        lines = [
+            inp.load(formatter="text")
+            for inp in self.input()
+        ]
+
+        # remove empty lines
+        lines = [_line for _line in (line.strip() for line in lines) if _line]
+
+        # save it
+        self.output().dump(
+            "\n".join(lines),
+            formatter="text",
+        )
 
 
-# class RuntimeMeasurement(RuntimeParameters):
-#     """
-#     Task to provide the time measurements of the inference of a network in cmssw, given the input parameters
-
-#     Output is the result.csv file.
-#     """
-
-#     batch_sizes = law.CSVParameter(
-#         cls=luigi.IntParameter,
-#         default=(1, 2, 4),
-#         max_len=20,
-#         description="the different batchsizes to be tested; default: 1,2,4)",
-#     )
-
-#     sandbox = "bash::$MLP_BASE/sandboxes/mlprof_gcc900_12_2_3.sh"
-
-#     # def requires(self):
-#     #     return [RuntimeMeasurementOneBatchSize.req(self, batch_size=i) for i in self.batch_sizes]
-#     def requires(self):
-#         return CreateConfigRuntime.req(self)
-
-#     def output(self):
-#         if self.output_directory != law.NO_STR:
-#             return LocalFileTarget(path=os.path.join(self.output_directory, "results.csv"))
-#         else:
-#             return self.local_target("results.csv")
-
-#     def run(self):
-#         if not os.path.isdir(self.output().dirname):
-#             os.makedirs(self.output().dirname)
-
-#         batchsizes_list = list(self.batch_sizes)
-#         batchsizes_argument_varparser = batchsizes_list.copy()
-#         for i, batchsize in enumerate(batchsizes_argument_varparser):
-#             batchsizes_argument_varparser[i] = "batchsizes=" + str(batchsize)
-
-#         # embed()
-#         process = subprocess.Popen("source " + os.path.join(os.environ.get("MLP_BASE"), "mlprof", "tools", "runtime.sh") +
-#                                    all_elements_list_as_one_string(batchsizes_argument_varparser, " "),
-#                                    shell=True,
-#                                    stdout=None,
-#                                    stderr=None)
-#         process.wait()
-
-
-class RuntimePlotterTask(RuntimeParameters, law.tasks.RunOnceTask):
+class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask):
     """
     Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
     default are 1, 2 and 4.
     """
-    # number_runs = RuntimeMeasurement.number_runs
-    output_directory_plot = luigi.Parameter(default=law.NO_STR,
-                                       description="The path to the folder to save the pdf file "
-                                       "with the plots called runtime_plot_different_batchsizes.pdf, "
-                                       "standard law path will be used if value "
-                                       "is law.NO_STR; default:law.NO_STR",
-                                            )
-    # output_directory = RuntimeMeasurementSingleBatchSizes.output_directory
-    batch_sizes = RuntimeMeasurement.batch_sizes
+
+    sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
 
     def requires(self):
-        return RuntimeMeasurement.req(self)
+        return MergeRuntimes.req(self)
 
     def output(self):
-        if self.output_directory_plot != law.NO_STR:
-            return LocalFileTarget(path=os.path.join(self.output_directory_plot,
-                                                     "runtime_plot_different_batchsizes" +
-                                                     all_elements_list_as_one_string(self.batch_sizes, "_") + ".pdf"))
-        else:
-            return self.local_target("runtime_plot_different_batchsizes" + all_elements_list_as_one_string(self.batch_sizes, "_") + ".pdf")
+        return self.local_target(f"runtime_plot_different_batchsizes_{self.batch_sizes_repr}.pdf")
 
+    @view_output_plots
     def run(self):
-        import numpy as np
+        # prepare the output directory
+        output = self.output()
+        output.parent.touch()
 
-        if not os.path.isdir(self.output().dirname):
-            os.makedirs(self.output().dirname)
-        # embed()
-        plot_batchsize(np.array(self.batch_sizes), self.number_runs, self.input().path, self.output().path)
+        # create the plot
+        plot_batchsize(self.batch_sizes, self.repetitions, self.input().path, output.path)
         print("plot saved")

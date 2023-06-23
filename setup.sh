@@ -60,8 +60,8 @@ setup_mlp() {
         rm -rf "${MLP_VENV_BASE}"
     fi
 
-    # source the default sandbox
-    source "${MLP_BASE}/sandboxes/venv_default.sh" "$@"
+    # source the base sandbox
+    source "${MLP_BASE}/sandboxes/base.sh" "$@"
 
     # prepend persistent path fragments again for ensure priority for local packages
     export PATH="${MLP_PERSISTENT_PATH}:${PATH}"

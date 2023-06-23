@@ -1,3 +1,4 @@
+# coding: utf-8
 
 
 def calculate_overall_mean_from_different_measurements(means, sample_sizes):
@@ -68,26 +69,3 @@ def plot_batchsize(different_batchsizes, sample_size, input_path, output_path):
     hep.cms.text(text="Simulation, Network test", loc=0)
     fig.savefig(output_path, bbox_inches='tight')
     plt.close()
-
-
-if __name__ == "__main__":
-    import argparse
-    import numpy as np
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-b", "--batchsizes", type=int, nargs='*',
-                        default=[1, 2, 4], help="the list of different batchsizes used during the test")
-    parser.add_argument("-nRuns", "--numberRuns", type=int, default=200,
-                        help="the statistics of each value in results.csv")
-    parser.add_argument("-i", "--inputPath", type=str,
-                        help="the path to the results.csv containing the results of the measurement")
-    parser.add_argument("-o", "--outputPath", type=str,
-                        help="the path to save the file")
-    args = parser.parse_args()
-
-    different_batchsizes = np.array(args.batchsizes)
-    ipath = args.inputPath
-    opath = args.outputPath
-    sample_size = args.numberRuns
-
-    plot_batchsize(different_batchsizes, sample_size, ipath, opath)
