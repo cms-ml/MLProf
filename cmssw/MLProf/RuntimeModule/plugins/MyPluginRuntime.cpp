@@ -146,6 +146,18 @@ void writeFile(float batch_size, float mean, float std, std::string csv_file)
   file.close();
 }
 
+void writeFileWholeVector(float batch_size, std::vector<float> runtimes, std::string csv_file)
+{
+  std::cout << runtimes.size() << std::endl;
+  std::ofstream file(csv_file, std::ios::out| std::ios::app);
+  for (int i = 0; i < (int) runtimes.size(); i++){
+    file << batch_size <<","<< runtimes[i] << std::endl;
+  }
+
+  file.close();
+}
+
+
 void print_list(std::list<int> const &list)
 {
     for (auto const &i: list) {
@@ -324,16 +336,16 @@ void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& se
       auto end = std::chrono::high_resolution_clock::now();
       std::chrono::duration<float> runtime_in_seconds = (end - start);
 
-      if (r > nWarmUps)
+      if (r >= nWarmUps)
       {
-        std::cout << "Current epoch: "<< r - nWarmUps << std::endl;
+        std::cout << "Current epoch: "<< r - nWarmUps +1 << std::endl;
         // conver runtimes to milli seconds
         runtimes.push_back(runtime_in_seconds.count() * 1000 );
         std::cout << "Corresponding runtime: "<< runtime_in_seconds.count()*1000 << " ms" << std::endl;
       }
       else
       {
-        std::cout << "Current warm-up epoch: "<< r << std::endl;
+        std::cout << "Current warm-up epoch: "<< r + 1 << std::endl;
         continue;
       }
     }
@@ -346,7 +358,17 @@ void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& se
     std_runtimes.push_back(std_runtime);
 
     // save performance not divided by batch size
-    writeFile(batchSize, mean_runtime, std_runtime, filenameOutputCsv_);
+    //writeFile(batchSize, mean_runtime, std_runtime, filenameOutputCsv_);
+    std::cout << "begin writing file" << std::endl;
+    auto start_writing = std::chrono::high_resolution_clock::now();
+    writeFileWholeVector(batchSize, runtimes, filenameOutputCsv_);
+    auto end_writing = std::chrono::high_resolution_clock::now();
+    std::cout << "file written" << std::endl;
+    std::chrono::duration<float> writing_time = (end_writing - start_writing);
+    std::chrono::milliseconds writing_time_ms = std::chrono::duration_cast< std::chrono::milliseconds >( writing_time );
+    std::cout << "time taken:" << writing_time.count() << "s" << std::endl;
+    std::cout << "time taken:" << writing_time_ms.count() << "ms" << std::endl;
+
   }
 }
 

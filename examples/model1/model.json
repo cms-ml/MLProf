@@ -10,5 +10,6 @@
         {
             "name": "Identity"
         }
-    ]
+    ],
+    "network_name": "dnn"
 }
