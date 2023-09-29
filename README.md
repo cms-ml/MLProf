@@ -12,29 +12,19 @@ source setup.sh
 
 This command is also used to activate your venv at the start of each new bash session.
 
-To check the setup and create a basic plot with this tool on an already existing graph, you may run the task ```RuntimePlotterTask```
+To check the setup and create a basic plot with this tool on an already existing graph, you may run the task [PlotRuntimes](#plotruntimes)
 with a simple call:
 
 ``` shell
-law run RuntimePlotterTask --version test_mlprof
+law run PlotRuntimes --version test_mlprof
 ```
 
-Do not forget to delete the configuration file created by ```CreateConfigRuntime``` before running your graph
-to adapt the inference parameters. For that, use for example:
-
-```shell
-law run RuntimePlotterTask --version test_mlprof --remove-output 3,i
-```
-
-Then choose ```n``` for all tasks except ```CreateConfigRuntime``` where you should choose ```a```.
-You can also delete the config file manually in ```MLProf/RuntimeModule/test/my_plugin_runtime_cfg.py```.
-Do not delete the template under ```MLProf/utils/my_plugin_runtime_cfg_template.py```.
 
 ## Law introduction
 
 As you can already see from the Quickstart section, this tool uses [law](https://github.com/riga/law) for
 the orchestration. Therefore, a short introduction to the most essential functions of law you should be
-aware of when using this tool are provided here. More informations are available for example in the "Examples"
+aware of when using this tool are provided here. More informations are available for example in the "[Examples](https://github.com/riga/law#examples)"
 section of this [Github repository](https://github.com/riga/law).
 This section can be ignored if you are already familiar with law.
 
@@ -45,11 +35,25 @@ runtime measurement task to have already run, in order to have data to plot. Thi
 by the presence or absence of the corresponding output file from the required task. If the required file is not present,
 the required task will be automatically started with the corresponding parameters before the called task.
 
+The tree of runtime tasks in MLPROF is :
+
+```mermaid
+flowchart TD
+    A[CreateRuntimeConfig] --> B[MeasureRuntime]
+    B --> |merge the results for different batch sizes| C[MergeRuntimes]
+    C --> D[PlotRuntimes]
+    C --> E[PlotRuntimesMultipleCMSSW]
+    C --> F[PlotRuntimesSeveralNetworks]
+```
+
 A task is run with the command ```law run``` followed by the name of the task.
 A version, given by the argument ```--version```, followed by the name of the version, is required.
+Each ```version``` has its own set of outputs for the different existing tasks.
 
 In law, the intermediate results (=the outputs to the different tasks) are saved locally in the corresponding directory
-(default is ```data/name_of_the_task/name_of_the_version/```). Hence the name of the version should be selected to match your
+(default path in MLPROF is
+```data/name_of_the_task/CMSSW_architecture/model_identifier_with_run_parameters/name_of_the_version/```).
+Hence the name of the version should be selected to match your
 purpose, for example ```--version convolutional_nn_for_b_tagging```.
 
 Tasks in law are organized as a graph with dependencies. Therefore a "depth" for the different required tasks exists,
@@ -58,7 +62,8 @@ you might use the argument ```--print-status -1```, which will show all required
 of their output for the given input parameters up to depth "-1", hence the deepest one. The called task
 with ```law run``` will have depth 0. You might check the output path of a task with the
 argument ```--print-output```, followed by the depth of the task. If you want a finished task to be run anew without changing
-the version (e.g. do a new runtime measurement with more statistics), you might remove the previous outputs with the
+the version (e.g. do a new runtime measurement with a new
+training of the same original network), you might remove the previous outputs with the
 ```--remove-output``` argument, followed by the depth up to which to remove the outputs. There are three removal modes:
 - ```a``` (all: remove all outputs of the different tasks up to the given depth),
 - ```i``` (interactive: prompt a selection of the tasks to remove up to the given depth)
@@ -79,7 +84,7 @@ law run name_of_the_task --version name_of_the_version --remove-output 0,a,y
 An example command to see the location of the plot from this tool using only law functions and the default arguments for the tasks would be:
 
 ```shell
-law run RuntimePlotterTask --version test_mlprof --print-output 0
+law run PlotRuntimes --version test_mlprof --print-output 0
 ```
 
 
@@ -88,32 +93,40 @@ law run RuntimePlotterTask --version test_mlprof --print-output 0
 
 This tools uses the c++ ```<chrono>``` library for runtime measurements and (soon) [IgProf](https://igprof.org/) for the memory profiling.
 It allows for the measurement of TensorFlow graphs with several input layers. The inputs can be up to 3 dimensional. As this tool is set
-to work in CMSSW, it requires a frozen graph (it is recommanded to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph)
+to work in CMSSW, it requires a frozen graph (it is recommended to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph)
 function with the argument "True" for variables_to_constant).
 
 
 ## Runtime measurement
 
-The dependency graph for the runtime measurement looks as follows: [runtime_tasks.pdf](https://github.com/uhh-cms/MLProf/files/11489389/runtime_tasks.pdf)
+The dependency graph for the runtime measurement looks as follows:
 
-It is composed of four tasks:
+```mermaid
+flowchart TD
+    A[CreateRuntimeConfig] --> B[MeasureRuntime]
+    B --> |merge the results for different batch sizes| C[MergeRuntimes]
+    C --> D[PlotRuntimes]
+    C --> E[PlotRuntimesMultipleCMSSW]
+    C --> F[PlotRuntimesSeveralNetworks]
+```
 
-1. ```CreateConfigRuntime```: This task create the cmssw config file to run the inference. The parameters of the
-inference except the batch sizes are fixed by the created configuration file, therefore this task should be run again
-for every change in the inference (e.g. the number of runs for the statistics, the path to the graph to check...).
+It is composed of four major types of tasks:
 
-2. ```RuntimeMeasurementOneBatchSize```: This task runs the network as many times as demanded in the arguments for a
-single batch size and outputs a .csv file with the statistics of the timing measurements.
+1.[CreateRuntimeConfig](#createruntimeconfig): This task creates the cmssw config file to run the inference, using a
+json file for the model parameters.
 
-3. ```RuntimeMeasurement```: This task merges the .csv output files with the required multiple batch sizes
-from the ```RuntimeMeasurementOneBatchSize``` tasks to obtain a single .csv file containing the informations to plot.
+2. ```MeasureRuntime```: This task runs the network as many times as demanded in the arguments for a
+single batch size and outputs a .csv file with the results of the timing measurements.
 
-4. ```RuntimePlotterTask```: This task creates the plot with the values stored in the .csv file from ```RuntimeMeasurement```.
+3. ```MergeRuntimes```: This task merges the .csv output files with the required multiple batch sizes
+from the ```MeasureRuntime``` tasks to obtain a single .csv file containing the informations to plot.
 
-Calling the ```RuntimePlotterTask``` task triggers the whole pipeline with the correct arguments.
+4. ```PlotRuntimes```: These tasks create the plots with the values stored in the .csv file from ```MergeRuntimes```.
+
+Calling the ```PlotRuntimes``` task triggers the whole pipeline with the correct arguments.
 
 
-# CreateConfigRuntime
+# CreateRuntimeConfig
 
 This task create the CMSSW config file to run the inference in the corresponding task, using the template file in
 the ```MLProf/utils``` directory. The parameters of the inference except the batch sizes are fixed by the created
@@ -156,7 +169,7 @@ configuration file, therefore this task should be run again for every change in 
 ## Example:
 
 ```shell
-law run CreateConfigRuntime --version simple_dnn \
+law run CreateRuntimeConfig --version simple_dnn \
                             --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
                             --input-shapes input_0:784 \
                             --output-tensor-name Identity \
@@ -164,14 +177,14 @@ law run CreateConfigRuntime --version simple_dnn \
 ```
 
 
-# RuntimeMeasurementOneBatchSize
+# MeasureRuntime
 
 Task to provide the time measurements of the inference of a network in CMSSW, given the input parameters
 and a single batch size. The statistics of the measurement (batch size, mean, standard deviation) for each
 event taken from ```input-files``` are saved in csv format. Default number of events taken is 10.
 
 ## Requires:
-- The config file created by ```CreateConfigRuntime```.
+- The config file created by ```CreateRuntimeConfig```.
 
 ## Parameters:
 - batch-size: int. The size of the batch for which the runtime measurement is done. default: ```1```
@@ -211,7 +224,7 @@ of the runtime measurement for each "event" (set by ```number-events```) taken f
 ## Example:
 
 ```shell
-law run RuntimeMeasurementOneBatchSize --version simple_dnn \
+law run MeasureRuntime --version simple_dnn \
                                        --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
                                        --input-shapes input_0:784 \
                                        --output-tensor-name Identity \
@@ -220,14 +233,14 @@ law run RuntimeMeasurementOneBatchSize --version simple_dnn \
 ```
 
 
-# RuntimeMeasurement
+# MergeRuntimes
 
 This task merges the .csv output files with the required multiple batch sizes
-from the different occurences of the ```RuntimeMeasurementOneBatchSize``` task to obtain a single .csv
+from the different occurences of the ```MeasureRuntime``` task to obtain a single .csv
 file containing the informations to plot.
 
 ## Requires:
-- The .csv files from the several occurence of ```RuntimeMeasurementOneBatchSize``` (one for each batch size).
+- The .csv files from the several occurence of ```MeasureRuntime``` (one for each batch size).
 
 ## Parameters:
 - batch-sizes: int. The different batchsizes to be tested, separated by a comma.
@@ -268,7 +281,7 @@ of the several runtime measurements for each "event" (set by ```number-events```
 ## Example:
 
 ```shell
-law run RuntimeMeasurement --version simple_dnn \
+law run MergeRuntimes --version simple_dnn \
                            --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
                            --input-shapes input_0:784 \
                            --output-tensor-name Identity \
@@ -276,13 +289,13 @@ law run RuntimeMeasurement --version simple_dnn \
                            --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
 ```
 
-# RuntimePlotterTask
+# PlotRuntimes
 
 This task plots the results of the runtime measurement against the given batch sizes. The number of inferences behind one
 plotted data point is given by ```number-events * number-runs```.
 
 ## Requires:
-- The .csv file from the ```RuntimeMeasurement``` task.
+- The .csv file from the ```MergeRuntimes``` task.
 
 ## Parameters:
 - batch-sizes: int. The different batchsizes to be tested, separated by a comma.
@@ -327,7 +340,7 @@ against the different batch sizes given.
 ## Example:
 
 ```shell
-law run RuntimePlotterTask --version simple_dnn \
+law run PlotRuntimes --version simple_dnn \
                            --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
                            --input-shapes input_0:784 \
                            --output-tensor-name Identity \
