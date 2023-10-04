@@ -1,0 +1,15 @@
+{
+    "file": "/afs/cern.ch/user/n/nprouvos/public/conv_2d_inputs.pb",
+    "inputs": [
+        {
+            "name": "input_0_input",
+            "shape": [28,28,1]
+        }
+    ],
+    "outputs": [
+        {
+            "name": "Identity"
+        }
+    ],
+    "network_name": "cnn"
+}
