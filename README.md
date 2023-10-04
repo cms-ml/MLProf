@@ -112,124 +112,144 @@ flowchart TD
 
 It is composed of four major types of tasks:
 
-1.[CreateRuntimeConfig](#createruntimeconfig): This task creates the cmssw config file to run the inference, using a
+1. [CreateRuntimeConfig](#createruntimeconfig): This task creates the cmssw config file to run the inference, using a
 json file for the model parameters.
 
-2. ```MeasureRuntime```: This task runs the network as many times as demanded in the arguments for a
+2. [MeasureRuntime](#measureruntime): This task runs the network as many times as demanded in the arguments for a
 single batch size and outputs a .csv file with the results of the timing measurements.
 
-3. ```MergeRuntimes```: This task merges the .csv output files with the required multiple batch sizes
-from the ```MeasureRuntime``` tasks to obtain a single .csv file containing the informations to plot.
+3. [MergeRuntimes](#mergeruntimes): This task merges the .csv output files with the required multiple batch sizes
+from the [MeasureRuntime](#measureruntime) tasks to obtain a single .csv file containing the informations to plot.
 
-4. ```PlotRuntimes```: These tasks create the plots with the values stored in the .csv file from ```MergeRuntimes```.
+4. [PlotRuntimes](#plotruntimes), [PlotRuntimesSeveralNetworks](#plotruntimesseveralnetworks),
+[PlotRuntimesMultipleCMSSW](#plotruntimesmultiplecmssw): These tasks create the plots with the values stored in the
+.csv file from [MergeRuntimes](#mergeruntimes).
 
-Calling the ```PlotRuntimes``` task triggers the whole pipeline with the correct arguments.
+Calling the [PlotRuntimes](#plotruntimes) task triggers the whole pipeline with the correct arguments.
 
+The way to give the necessary informations about your model to MLProf is by using a json file.
+Its structure is presented below in [Model file in json format](#model-file-in-json-format)
+
+# Model file in json format
+
+The format of the file to give to MLProf is the following:
+
+```json
+{
+    "file": "{absolute_path_to_you_pb_model_file}",
+    "inputs": [
+        {
+            "name": "{name_input_layer_1}",
+            "shape": [size_dimension_1, size_dimension_2, ...]
+        },
+        {
+            "name": "{name_input_layer_2}",
+            "shape": [size_dimension_1, size_dimension_2, ...]
+        },
+        ...
+    ],
+    "outputs": [
+        {
+            "name": "{name_of_the_output_layer_1}"
+        },
+        {
+            "name": "{name_of_the_output_layer_2}"
+        },
+        ...
+    ],
+    "network_name": "{name_of_the_network_for_the_legend_of_the_plots_and_the_name_of_the_output_pdf_of_PlotRuntimesSeveralNetworks}"
+}
+```
+There are already a few examples of these configswith working paths for the networks in the "examples" folder.
 
 # CreateRuntimeConfig
 
 This task create the CMSSW config file to run the inference in the corresponding task, using the template file in
-the ```MLProf/utils``` directory. The parameters of the inference except the batch sizes are fixed by the created
-configuration file, therefore this task should be run again for every change in the inference.
+the ```cmssw/MLProf/RuntimeModule/test/``` directory. The parameters of the inference except the batch sizes are fixed by the created
+configuration file, therefore this task will be run again for every change in the inference.
 (e.g. the number of runs for the statistics, the path to the graph to check...).
 
 ## Parameters:
-- graph-path: str.  The path of the .pb graph to be tested. default: ```/afs/cern.ch/user/n/nprouvos/public/graph.pb```
 
-- input-files: str. The absolute path of the input files in root format to be openened in CMSSW, needed for
-                    cmsRun and the ```number-events```argument but might NOT be used for the input values,
-                    depending on the input type argument.
-                    default: ```/afs/cern.ch/user/n/nprouvos/public/testfile.root```
+- model-file: str. The absolute path of the json file containing the informations of the model to be tested.
+                   default=```$MLP_BASE/examples/model1/model.json```.
 
-- number-events: int. The number of events to take from the input files for the inference. default: ```10```
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
 
-- output-directory: str. The path to the folder to save the csv files with the results for the inference tasks,
-                        standard law path will be used if value is law.NO_STR. default: ```law.NO_STR```
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
 
-- input-type: str, either "random" or "incremental". Type of input values to be used, for testing the network,
-                    either random or incremental ("custom" preprocessing taking the events from the input files
-                    to be implemented). default: ```random```
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
 
-- number-runs: int. The number of batches to be evaluated and measurement averaged upon for each event. default: ```500```
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
 
-- number-warm_ups: int. The number of batches to be evaluated to warm up the hardware before the actual measurement.
-                    default: ```50```
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
 
-- input-shapes: str. The name of the input layers followed by their shapes, separated by a comma.
-                The format is ```'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'```
-                Therefore, the name of the layer may not contain ':'. default: ```'input:10'```.
+- cmssw-version: str. The CMSSW version used for the inference. default: ```CMSSW_12_2_4```
 
-- output-tensor-names: str. The name of the output nodes, separated by a comma.
-                    The format is ```'name_output_tensor1,name_output_tensor2...'```. default is ```'Identity'```
-
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```MLProf/RuntimeModule/test/my_plugin_runtime_cfg.py```: the config file for the ```RuntimeModule``` in MLProf.
+- ```cfg.py```: the config file for the ```RuntimeModule``` in ```cmssw/MLProf```.
 
 ## Example:
 
 ```shell
-law run CreateRuntimeConfig --version simple_dnn \
-                            --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
-                            --input-shapes input_0:784 \
-                            --output-tensor-name Identity \
-                            --number-runs 500
+law run CreateRuntimeConfig --version test_simple_dnn \
+                            --model-file $MLP_BASE/examples/model1/model.json \
+                            --model-name dnn \
+                            --repetitions 500 \
+                            --cmssw-version CMSSW_12_2_4
 ```
 
 
 # MeasureRuntime
 
 Task to provide the time measurements of the inference of a network in CMSSW, given the input parameters
-and a single batch size. The statistics of the measurement (batch size, mean, standard deviation) for each
-event taken from ```input-files``` are saved in csv format. Default number of events taken is 10.
+and a single batch size. The batch size and the (```repetitions * events```) measured values in
+milliseconds are saved in csv format.
 
 ## Requires:
 - The config file created by ```CreateRuntimeConfig```.
 
 ## Parameters:
-- batch-size: int. The size of the batch for which the runtime measurement is done. default: ```1```
+- batch-size: int. the batch size to measure the runtime for; default: ```1```.
 
-- graph-path: str.  The path of the .pb graph to be tested. default: ```/afs/cern.ch/user/n/nprouvos/public/graph.pb```
+- model-file: str. The absolute path of the json file containing the informations of the model to be tested.
+                   default=```$MLP_BASE/examples/model1/model.json```.
 
-- input-files: str. The absolute path of the input files in root format to be openened in CMSSW, needed for
-                    cmsRun and the ```number-events```argument but might NOT be used for the input values,
-                    depending on the input type argument.
-                    default: ```/afs/cern.ch/user/n/nprouvos/public/testfile.root```
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
 
-- number-events: int. The number of events to take from the input files for the inference. default: ```10```
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
 
-- output-directory: str. The path to the folder to save the csv files with the results for the inference tasks,
-                        standard law path will be used if value is law.NO_STR. default: ```law.NO_STR```
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
 
-- input-type: str, either "random" or "incremental". Type of input values to be used, for testing the network,
-                    either random or incremental ("custom" preprocessing taking the events from the input files
-                    to be implemented). default: ```random```
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
 
-- number-runs: int. The number of batches to be evaluated and measurement averaged upon for each event. default: ```500```
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
 
-- number-warm_ups: int. The number of batches to be evaluated to warm up the hardware before the actual measurement.
-                    default: ```50```
+- cmssw-version: str. The CMSSW version used for the inference. default: ```CMSSW_12_2_4```
 
-- input-shapes: str. The name of the input layers followed by their shapes, separated by a comma.
-                The format is ```'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'```
-                Therefore, the name of the layer may not contain ':'. default: ```'input:10'```.
-
-- output-tensor-names: str. The name of the output nodes, separated by a comma.
-                    The format is ```'name_output_tensor1,name_output_tensor2...'```. default is ```'Identity'```
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```results_batch_size_{batch-size}.csv```: The statistics (batch size, mean, standard deviation)
-of the runtime measurement for each "event" (set by ```number-events```) taken from the ```input-files```.
+- ```runtime_bs_{batch-size}.csv```: The batch size and measured values of the runtime
+for each repetition and event.
 
 ## Example:
 
 ```shell
-law run MeasureRuntime --version simple_dnn \
-                                       --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
-                                       --input-shapes input_0:784 \
-                                       --output-tensor-name Identity \
-                                       --number-runs 500 \
-                                       --batch-size 1
+law run MeasureRuntime --version test_simple_dnn \
+                       --model-file $MLP_BASE/examples/model1/model.json \
+                       --model-name dnn \
+                       --repetitions 500 \
+                       --cmssw-version CMSSW_12_2_4 \
+                       --batch-size 1
 ```
 
 
@@ -240,98 +260,79 @@ from the different occurences of the ```MeasureRuntime``` task to obtain a singl
 file containing the informations to plot.
 
 ## Requires:
-- The .csv files from the several occurence of ```MeasureRuntime``` (one for each batch size).
+- The .csv files from the several occurences of ```MeasureRuntime``` (one for each batch size).
 
 ## Parameters:
-- batch-sizes: int. The different batchsizes to be tested, separated by a comma.
-            The format is ```batch_size1,batch_size2...```. default: ```1,2,4```.
+- batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
-- graph-path: str.  The path of the .pb graph to be tested. default: ```/afs/cern.ch/user/n/nprouvos/public/graph.pb```
+- model-file: str. The absolute path of the json file containing the informations of the model to be tested.
+                   default=```$MLP_BASE/examples/model1/model.json```.
 
-- input-files: str. The absolute path of the input files in root format to be openened in CMSSW, needed for
-                    cmsRun and the ```number-events```argument but might NOT be used for the input values,
-                    depending on the input type argument.
-                    default: ```/afs/cern.ch/user/n/nprouvos/public/testfile.root```
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
 
-- number-events: int. The number of events to take from the input files for the inference. default: ```10```
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
 
-- output-directory: str. The path to the folder to save the csv files with the results for the inference tasks,
-                        standard law path will be used if value is law.NO_STR. default: ```law.NO_STR```
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
 
-- input-type: str, either "random" or "incremental". Type of input values to be used, for testing the network,
-                    either random or incremental ("custom" preprocessing taking the events from the input files
-                    to be implemented). default: ```random```
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
 
-- number-runs: int. The number of batches to be evaluated and measurement averaged upon for each event. default: ```500```
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
 
-- number-warm_ups: int. The number of batches to be evaluated to warm up the hardware before the actual measurement.
-                    default: ```50```
+- cmssw-version: str. The CMSSW version used for the inference. default: ```CMSSW_12_2_4```
 
-- input-shapes: str. The name of the input layers followed by their shapes, separated by a comma.
-                The format is ```'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'```
-                Therefore, the name of the layer may not contain ':'. default: ```'input:10'```.
-
-- output-tensor-names: str. The name of the output nodes, separated by a comma.
-                    The format is ```'name_output_tensor1,name_output_tensor2...'```. default is ```'Identity'```
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```results_batchsizes_{batch_size_1}_{batch_size_2}_{...}.csv```: The statistics (batch size, mean, standard deviation)
-of the several runtime measurements for each "event" (set by ```number-events```) taken from the ```input-files```.
+- ```runtime_bs_{batch_size_1}_{batch_size_2}_{...}.csv```: The batch size and measured values of the runtime
+for each repetition and event in the several measurements.
 
 ## Example:
 
 ```shell
-law run MergeRuntimes --version simple_dnn \
-                           --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
-                           --input-shapes input_0:784 \
-                           --output-tensor-name Identity \
-                           --number-runs 500 \
-                           --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+law run MergeRuntimes --version test_simple_dnn \
+                      --model-file $MLP_BASE/examples/model1/model.json \
+                      --model-name dnn \
+                      --repetitions 500 \
+                      --cmssw-version CMSSW_12_2_4 \
+                      --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
 ```
 
 # PlotRuntimes
 
-This task plots the results of the runtime measurement against the given batch sizes. The number of inferences behind one
-plotted data point is given by ```number-events * number-runs```.
+This task plots the results of the runtime measurement against the given batch sizes. The points are
+given by the median of the data series and the boundaries of the uncertainty bands are given by the 16 and
+84 percentiles of the data series (Therefore the uncertainty band contains 68% of the data points,
+which corresponds to a $1\sigma$ uncertainty for gaussian uncertainties). The number of inferences behind one
+plotted data point is given by ```events * repetitions```.
 
 ## Requires:
 - The .csv file from the ```MergeRuntimes``` task.
 
 ## Parameters:
-- batch-sizes: int. The different batchsizes to be tested, separated by a comma.
-            The format is ```batch_size1,batch_size2...```. default: ```1,2,4```.
+- batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
-- output_directory_plot: str. The path to the folder to save the pdf file with the plot,
-                standard law path will be used if value is ```law.NO_STR```.
-                default: ```law.NO_STR```
+- model-file: str. The absolute path of the json file containing the informations of the model to be tested.
+                   default=```$MLP_BASE/examples/model1/model.json```.
 
-- graph-path: str.  The path of the .pb graph to be tested. default: ```/afs/cern.ch/user/n/nprouvos/public/graph.pb```
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
 
-- input-files: str. The absolute path of the input files in root format to be openened in CMSSW, needed for
-                    cmsRun and the ```number-events```argument but might NOT be used for the input values,
-                    depending on the input type argument.
-                    default: ```/afs/cern.ch/user/n/nprouvos/public/testfile.root```
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
 
-- number-events: int. The number of events to take from the input files for the inference. default: ```10```
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
 
-- output-directory: str. The path to the folder to save the csv files with the results for the inference tasks,
-                        standard law path will be used if value is law.NO_STR. default: ```law.NO_STR```
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
 
-- input-type: str, either "random" or "incremental". Type of input values to be used, for testing the network,
-                    either random or incremental ("custom" preprocessing taking the events from the input files
-                    to be implemented). default: ```random```
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
 
-- number-runs: int. The number of batches to be evaluated and measurement averaged upon for each event. default: ```500```
+- cmssw-version: str. The CMSSW version used for the inference. default: ```CMSSW_12_2_4```
 
-- number-warm_ups: int. The number of batches to be evaluated to warm up the hardware before the actual measurement.
-                    default: ```50```
-
-- input-shapes: str. The name of the input layers followed by their shapes, separated by a comma.
-                The format is ```'name_input_tensor1:first_dimension_shape-second_dim_shape,name_input_tensor2:...'```
-                Therefore, the name of the layer may not contain ':'. default: ```'input:10'```.
-
-- output-tensor-names: str. The name of the output nodes, separated by a comma.
-                    The format is ```'name_output_tensor1,name_output_tensor2...'```. default is ```'Identity'```
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
 - ```runtime_plot_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
@@ -340,11 +341,121 @@ against the different batch sizes given.
 ## Example:
 
 ```shell
-law run PlotRuntimes --version simple_dnn \
-                           --graph-path /afs/cern.ch/user/n/nprouvos/public/simple_dnn.pb \
-                           --input-shapes input_0:784 \
-                           --output-tensor-name Identity \
-                           --number-runs 500 \
-                           --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+law run PlotRuntimes --version test_simple_dnn \
+                     --model-file $MLP_BASE/examples/model1/model.json \
+                     --model-name dnn \
+                     --repetitions 500 \
+                     --cmssw-version CMSSW_12_2_4 \
+                     --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+```
+
+# PlotRuntimesSeveralNetworks
+
+This task plots the results of the runtime measurement against the given batch sizes for several models.
+The model-files argument is required and replaces the module-file argument. The points are
+given by the median of the data series and the boundaries of the uncertainty bands are given by the 16 and
+84 percentiles of the data series (Therefore the uncertainty band contains 68% of the data points,
+which corresponds to a $1\sigma$ uncertainty for gaussian uncertainties). The number of inferences behind one
+plotted data point is given by ```events * repetitions```.
+
+## Requires:
+- The .csv file from the ```MergeRuntimes``` task.
+
+## Parameters:
+- model-files: str. The comma-separated list of the absolute paths of the json files containing the
+                    informations of the model to be tested. No default value.
+
+- batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
+
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
+
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
+
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
+
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
+
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
+
+- cmssw-version: str. The CMSSW version used for the inference. default: ```CMSSW_12_2_4```
+
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
+
+## Output:
+- ```runtime_plot_networks_{network_name_1}_{network_name_2}_{...}_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
+against the different batch sizes given.
+
+## Example:
+
+```shell
+law run PlotRuntimesSeveralNetworks --version test_several_networks \
+                                    --model-files $MLP_BASE/examples/model1/model.json,$MLP_BASE/examples/cnn/model_cnn.json\
+                                    --repetitions 500 \
+                                    --cmssw-version CMSSW_12_2_4 \
+                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+```
+
+# PlotRuntimesMultipleCMSSW
+
+This task plots the results of the runtime measurement against the given batch sizes for several CMSSW versions.
+The cmssw-versions argument replaces the cmssw-version argument. The cmssw-versions argument accepts brace expansions,
+see below in the Example subsection. The points are
+given by the median of the data series and the boundaries of the uncertainty bands are given by the 16 and
+84 percentiles of the data series (Therefore the uncertainty band contains 68% of the data points,
+which corresponds to a $1\sigma$ uncertainty for gaussian uncertainties). The number of inferences behind one
+plotted data point is given by ```events * repetitions```.
+
+## Requires:
+- The .csv file from the ```MergeRuntimes``` task.
+
+## Parameters:
+- cmssw-versions: str. The comma separated list of CMSSW version used for the inference.
+                       default: ```"CMSSW_12_2_4","CMSSW_12_2_2"```
+
+- batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
+
+- model-file: str. The absolute path of the json file containing the informations of the model to be tested.
+                   default=```$MLP_BASE/examples/model1/model.json```.
+
+- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
+        ```--model-file```. default: empty.
+
+- input-files: str. comma-separated list of absolute paths of input files for the CMSSW analyzer (TODO: not implemented);
+                    when empty, random input values will be used; default: empty
+
+- events: int. The number of events to read from each input file for averaging measurements. default: ```1```
+
+- repetitions: int. The number of repetitions to be performed per evaluation for averaging. default: ```100```
+
+- warmup: int. The number of evaluations to be performed before starting the actual measurement.
+                    default: ```10```
+
+- scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
+
+## Output:
+- ```runtime_plot__multiple_cmssw_{cmssw_version_1}_{cmssw_version_2}_{...}_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
+against the different batch sizes given.
+
+## Example:
+
+```shell
+law run PlotRuntimesMultipleCMSSW --version test_multiple_cmssw \
+                                  --cmssw-versions CMSSW_12_2_4,CMSSW_12_2_2 \
+                                  --model-file $MLP_BASE/examples/model1/model.json \
+                                  --repetitions 500 \
+                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+```
+
+equivalent to the brace expanded version:
+
+```shell
+law run PlotRuntimesMultipleCMSSW --version test_multiple_cmssw \
+                                  --cmssw-versions "CMSSW_12_2_{2,4}" \
+                                  --model-file $MLP_BASE/examples/model1/model.json \
+                                  --repetitions 500 \
+                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
 ```
 
