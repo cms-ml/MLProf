@@ -1,5 +1,7 @@
 # MLProf
 
+[![Lint and test](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml/badge.svg)](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml)
+
 Tools for automated ML model performance tests in CMSSW
 
 ## Quickstart
