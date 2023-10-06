@@ -366,7 +366,7 @@ void MyPluginRuntime::analyze(const edm::Event& event, const edm::EventSetup& se
     std::cout << "file written" << std::endl;
     // std::chrono::duration<float> writing_time = (end_writing - start_writing);
     // std::chrono::milliseconds writing_time_ms = std::chrono::duration_cast< std::chrono::milliseconds >( writing_time );
-    std::cout << "time taken:" << writing_time.count() << "s" << std::endl;
+    // std::cout << "time taken:" << writing_time.count() << "s" << std::endl;
     // std::cout << "time taken:" << writing_time_ms.count() << "ms" << std::endl;
 
   }
