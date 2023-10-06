@@ -53,7 +53,7 @@ class RuntimeParameters(BaseTask):
     )
     input_files = law.CSVParameter(
         default=(),
-        description="comma-separeted list of absolute paths of input files for the CMSSW analyzer; "
+        description="comma-separated list of absolute paths of input files for the CMSSW analyzer; "
         "when empty, random input values will be used; default: empty",
     )
     events = luigi.IntParameter(
@@ -69,7 +69,7 @@ class RuntimeParameters(BaseTask):
     warmup = luigi.IntParameter(
         default=10,
         significant=False,
-        description="number of evaluations to be performed before averaging; default: 10",
+        description="number of evaluations to be performed before starting the actual measurement; default: 10",
     )
 
     @property
@@ -106,8 +106,7 @@ class RuntimeParameters(BaseTask):
 
 class BatchSizesParameters(BaseTask):
     """
-    TODO:
-        - move to base (or even better: a different name)
+    TODO: docstring
     """
 
     batch_sizes = law.CSVParameter(
@@ -120,3 +119,25 @@ class BatchSizesParameters(BaseTask):
     @property
     def batch_sizes_repr(self):
         return "_".join(map(str, self.batch_sizes))
+
+class PlotCustomParameters(BaseTask):
+    """
+    TODO: docstring
+    """
+
+    log_y = luigi.BoolParameter(
+        default=False,
+        description="plot the y-axis values logarithmically; default: False",
+    )
+    bs_normalized = luigi.BoolParameter(
+        default=True,
+        description="normalize the measured values with the batch size; default: True",
+    )
+    filling = luigi.BoolParameter(
+        default=True,
+        description="plot the errors as error bands instead of error bars; default: True",
+    )
+
+    @property
+    def custom_plot_params(self):
+        return {"log_y":self.log_y, "bs_normalized":self.bs_normalized, "filling":self.filling}

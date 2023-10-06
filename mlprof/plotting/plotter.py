@@ -59,7 +59,7 @@ def open_csv_file(path, columns):
     return pd_dataset
 
 
-def calculate_means_and_errors_per_batch_size(different_batchsizes, path):
+def calculate_medians_and_errors_per_batch_size(different_batchsizes, path):
     import pandas as pd
     import numpy as np
 
@@ -79,6 +79,12 @@ def calculate_means_and_errors_per_batch_size(different_batchsizes, path):
         err_down[i] = abs(np.percentile(runtimes_per_batchsize, 16) - median)
         err_up[i] = abs(np.percentile(runtimes_per_batchsize, 84) - median)
     return medians, err_down, err_up
+
+
+def apply_individual_customizations(customization_dict, fig, ax):
+    import matplotlib.pyplot as plt
+    if customization_dict["log_y"]:
+        plt.yscale("log")
 
 
 def plot_batchsize_old(different_batchsizes, sample_size, input_path, output_path):
@@ -124,7 +130,7 @@ def plot_batchsize(different_batchsizes, input_path, output_path):
     import matplotlib.pyplot as plt
     import mplhep as hep
 
-    medians, err_down, err_up = calculate_means_and_errors_per_batch_size(different_batchsizes, input_path)
+    medians, err_down, err_up = calculate_medians_and_errors_per_batch_size(different_batchsizes, input_path)
     hep.set_style(hep.style.CMS)
 
     fig, ax = plt.subplots(1, 1)
@@ -162,14 +168,14 @@ def fill_plot(x, y, yerr_d, yerr_u, filling, model_name, color):
 
 
 def plot_batchsize_several_measurements(different_batchsizes, input_paths, output_path, measurements,
-                                    bs_normalized=True, filling=True):
+                                        customization_dict):
     import matplotlib.pyplot as plt
     import mplhep as hep
 
     plotting_values = {}
     for i, input_path in enumerate(input_paths):
-        medians, err_down, err_up = calculate_means_and_errors_per_batch_size(different_batchsizes, input_path)
-        if bs_normalized:
+        medians, err_down, err_up = calculate_medians_and_errors_per_batch_size(different_batchsizes, input_path)
+        if customization_dict["bs_normalized"]:
             medians = medians / different_batchsizes
             err_down = err_down / different_batchsizes
             err_up = err_up / different_batchsizes
@@ -182,11 +188,12 @@ def plot_batchsize_several_measurements(different_batchsizes, input_paths, outpu
         color = next(ax._get_lines.prop_cycler)['color']
         legend = fill_plot(different_batchsizes, plotting_values[measurements[i]]["medians"],
                   plotting_values[measurements[i]]["err_down"],
-                  plotting_values[measurements[i]]["err_up"], filling, measurements[i],
+                  plotting_values[measurements[i]]["err_up"], customization_dict["filling"], measurements[i],
                   color)  # colors["mpl_standard"][i])
         to_legend += [legend]
     plt.legend(to_legend, measurements)
     plt.xscale("log")
+    apply_individual_customizations(customization_dict, fig, ax)
     plt.xlabel("batch size")
     plt.ylabel("runtime/batch size [ms]")
     plt.ylim(bottom=0)
