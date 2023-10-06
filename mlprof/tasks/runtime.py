@@ -10,7 +10,7 @@ import law
 from mlprof.tasks.base import CommandTask, PlotTask, view_output_plots
 from mlprof.tasks.parameters import RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotCustomParameters
 from mlprof.tasks.sandboxes import CMSSWSandboxTask
-from mlprof.plotting.plotter import plot_batchsize, plot_batchsize_several_measurements
+from mlprof.plotting.plotter import plot_batchsize_several_measurements
 
 
 class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
@@ -170,8 +170,8 @@ class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, Plo
 
 class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, PlotCustomParameters):
     """
-    Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
-    default are 1, 2 and 4.
+    Task to plot the results from the runtime measurements for several networks, depending on the batch sizes
+    given as parameters, default are 1, 2 and 4.
     """
 
     sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
@@ -207,15 +207,13 @@ class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizes
             input_paths += [input_task.path]
         plot_batchsize_several_measurements(self.batch_sizes, input_paths,
                                         output.path, network_names, self.custom_plot_params)
-        # plot_batchsize_several_measurements(self.batch_sizes, [self.input()[0].path, self.input()[0].path],
-        #                                output.path, ["model_1", "model_2"])
         print("plot saved")
 
 
 class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, PlotCustomParameters):
     """
-    Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
-    default are 1, 2 and 4.
+    Task to plot the results from the runtime measurements for inferences performed in multiple cmssw versions,
+    depending on the batch sizes given as parameters, default are 1, 2 and 4.
     """
 
     sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
@@ -247,6 +245,4 @@ class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesPa
         from IPython import embed; embed()
         plot_batchsize_several_measurements(self.batch_sizes, input_paths,
                                         output.path, self.cmssw_versions, self.custom_plot_params)
-        # plot_batchsize_several_measurements(self.batch_sizes, [self.input()[0].path, self.input()[0].path],
-        #                                 output.path, ["CMSSW_12_2_4", "CMSSW_12_2_4"])
         print("plot saved")

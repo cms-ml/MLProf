@@ -14,8 +14,7 @@ from mlprof.tasks.base import BaseTask
 
 class CMSSWParameters(BaseTask):
     """
-    TODO:
-        - move to base (or even better: a different name)
+    Parameters related to the CMSSW environment
     """
 
     cmssw_version = luigi.Parameter(
@@ -40,6 +39,9 @@ class CMSSWParameters(BaseTask):
 
 
 class RuntimeParameters(BaseTask):
+    """
+    General parameters for the model definition and the runtime measurement
+    """
 
     model_file = luigi.Parameter(
         default="$MLP_BASE/examples/model1/model.json",
@@ -106,7 +108,7 @@ class RuntimeParameters(BaseTask):
 
 class BatchSizesParameters(BaseTask):
     """
-    TODO: docstring
+    Parameter to add several batch sizes to perform the measurement on
     """
 
     batch_sizes = law.CSVParameter(
@@ -122,7 +124,7 @@ class BatchSizesParameters(BaseTask):
 
 class PlotCustomParameters(BaseTask):
     """
-    TODO: docstring
+    Parameters for customization of plotting
     """
 
     log_y = luigi.BoolParameter(

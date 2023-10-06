@@ -6,47 +6,6 @@ colors = {"mpl_standard": ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'
           "custom_facecolor": ['#FF9848', '#089FFF', '#7EFF99'],
           }
 
-
-def calculate_overall_mean_from_different_measurements(means, sample_sizes):
-    '''
-    Helper function to measure the overall mean of subsequent measurements of the same underlying
-    distribution (e.g. several runtime measurements for the same batch size)
-    '''
-    return sum(means * sample_sizes) / sum(sample_sizes)
-
-
-def calculate_overall_mean_and_std_from_different_measurements(means, stds, sample_sizes):
-    '''
-    Helper function calculating the overall mean and standard deviation of subsequent measurements
-    of the same underlying distribution (e.g. several runtime measurements for the same batch size)
-    '''
-    import numpy as np
-
-    mean = calculate_overall_mean_from_different_measurements(means, sample_sizes)
-    std = np.sqrt(sum(stds**2 * (sample_sizes) + sample_sizes * (mean - means)**2) / (sum(sample_sizes)))
-    return mean, std
-
-
-def calculate_means_and_stds_per_batch_size(different_batchsizes, sample_size, path):
-    '''
-    Calculate the mean and standard deviations of the different measurements for each batch size separately
-    '''
-    import numpy as np
-    import pandas as pd
-
-    means = np.empty(len(different_batchsizes))
-    stds = np.empty(len(different_batchsizes))
-    pd_dataset = pd.read_csv(path, delimiter=",", names=["batch_size", "mean", "std"])
-    for i, batchsize in enumerate(different_batchsizes):
-        means_per_batchsize = pd_dataset.loc[pd_dataset["batch_size"] == batchsize, "mean"]
-        stds_per_batchsize = pd_dataset.loc[pd_dataset["batch_size"] == batchsize, "std"]
-        sample_sizes = np.ones_like(means_per_batchsize) * sample_size
-        means[i], stds[i] = calculate_overall_mean_and_std_from_different_measurements(means_per_batchsize,
-                                                                                       stds_per_batchsize,
-                                                                                       sample_sizes)
-    return means, stds
-
-
 def open_csv_file(path, columns):
     import pandas as pd
     pd_dataset = pd.read_csv(path, delimiter=",", names=columns)
@@ -60,13 +19,20 @@ def open_csv_file(path, columns):
 
 
 def calculate_medians_and_errors_per_batch_size(different_batchsizes, path):
+    '''
+    Calculate and plot the medians and errors of the runtime per batchsize
+
+    Args:
+    different_batchsizes: list(int). The list of different batch sizes to be plotted
+    path: str. The path to the csv file containing the results of the measurement.
+    '''
     import pandas as pd
     import numpy as np
 
     # open the csv file
     pd_dataset = open_csv_file(path, ["batch_size", "runtimes"])
 
-    # create the arrays to be plotted with mean values and up and down errors
+    # create the arrays to be plotted with median values and up and down errors
     medians = np.empty(len(different_batchsizes))
     err_down = np.empty(len(different_batchsizes))
     err_up = np.empty(len(different_batchsizes))
@@ -82,75 +48,30 @@ def calculate_medians_and_errors_per_batch_size(different_batchsizes, path):
 
 
 def apply_individual_customizations(customization_dict, fig, ax):
+    '''
+    Apply the remaining customization parameters from the command line
+
+    Args:
+    customization_dict: dict. The dictionary containing the customization parameters
+    fig, ax: the matplotlib object to handle figure and axis.
+    '''
     import matplotlib.pyplot as plt
     if customization_dict["log_y"]:
         plt.yscale("log")
 
 
-def plot_batchsize_old(different_batchsizes, sample_size, input_path, output_path):
+def fill_plot(x, y, yerr_d, yerr_u, filling, color):
     '''
-    Calculate and plot the mean and standard deviation of the runtime per batchsize
+    Fill the plots with the measured values and their errors
 
     Args:
-    different_batchsizes: list(int). The list of different batch sizes to be plotted
-    sample_size: int. The underlying statistics of the mean and stds values to be obtained from input_path
-    input_path: str. The path to the csv file containing the results of the measurement.
-    output_path: str. The path to which the plot has to be saved.
+    x: array(float). x-axis values
+    y: array(float). y-axis values
+    yerr_d: array(float). error down on the y-axis
+    yerr_u: array(float). error up on the y-axis
+    filling: bool. customizatioon parameter to decide if the errors will be represented as error bars or bands
+    color: the colors to use for the plotted values
     '''
-    import matplotlib.pyplot as plt
-    import mplhep as hep
-
-    means, stds = calculate_means_and_stds_per_batch_size(different_batchsizes, sample_size, input_path)
-    hep.set_style(hep.style.CMS)
-
-    fig, ax = plt.subplots(1, 1)
-    plt.errorbar(different_batchsizes, means / different_batchsizes, yerr=stds / different_batchsizes, capsize=12,
-                 marker=".", linestyle="")
-    plt.xscale("log")
-    plt.xlabel("batch size")
-    plt.ylabel("runtime/batch size [ms]")
-    ax.xaxis.set_major_locator(plt.MaxNLocator(len(different_batchsizes)))
-    ax.xaxis.set_minor_locator(plt.NullLocator())
-    plt.xticks(different_batchsizes, different_batchsizes)
-    hep.cms.text(text="Simulation, Network test", loc=0)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close()
-
-
-def plot_batchsize(different_batchsizes, input_path, output_path):
-    '''
-    Calculate and plot the mean and standard deviation of the runtime per batchsize
-
-    Args:
-    different_batchsizes: list(int). The list of different batch sizes to be plotted
-    sample_size: int. The underlying statistics of the mean and stds values to be obtained from input_path
-    input_path: str. The path to the csv file containing the results of the measurement.
-    output_path: str. The path to which the plot has to be saved.
-    '''
-    import matplotlib.pyplot as plt
-    import mplhep as hep
-
-    medians, err_down, err_up = calculate_medians_and_errors_per_batch_size(different_batchsizes, input_path)
-    hep.set_style(hep.style.CMS)
-
-    fig, ax = plt.subplots(1, 1)
-    color = next(ax._get_lines.prop_cycler)['color']
-    fill_plot(different_batchsizes, medians / different_batchsizes, err_down / different_batchsizes,
-              err_up / different_batchsizes, True, "", color)
-    plt.xscale("log")
-    # plt.yscale("log")
-    plt.xlabel("batch size")
-    plt.ylabel("runtime/batch size [ms]")
-    plt.ylim(bottom=0)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(len(different_batchsizes)))
-    ax.xaxis.set_minor_locator(plt.NullLocator())
-    plt.xticks(different_batchsizes, different_batchsizes)
-    hep.cms.text(text="Network test", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
-    fig.savefig(output_path, bbox_inches='tight')
-    plt.close()
-
-
-def fill_plot(x, y, yerr_d, yerr_u, filling, model_name, color):
     import matplotlib.pyplot as plt
     import numpy as np
     if filling:
@@ -169,9 +90,20 @@ def fill_plot(x, y, yerr_d, yerr_u, filling, model_name, color):
 
 def plot_batchsize_several_measurements(different_batchsizes, input_paths, output_path, measurements,
                                         customization_dict):
+    '''
+    General plotting function for runtime plots
+
+    Args:
+    different_batchsizes: list(int). The batch sizes to be used for the x-axis of the plot.
+    input_paths: list(str). The paths of the csv files containing the measurement results.
+    output_path: str. The path to be used for saving the plot.
+    measurements: list(str). The labels of the plot.
+    customization_dict: dict. The dictionary containing the customization parameters.
+    '''
     import matplotlib.pyplot as plt
     import mplhep as hep
 
+    # get the values to be plotted
     plotting_values = {}
     for i, input_path in enumerate(input_paths):
         medians, err_down, err_up = calculate_medians_and_errors_per_batch_size(different_batchsizes, input_path)
@@ -181,17 +113,23 @@ def plot_batchsize_several_measurements(different_batchsizes, input_paths, outpu
             err_up = err_up / different_batchsizes
         plotting_values[measurements[i]] = {"medians": medians, "err_down": err_down, "err_up": err_up}
 
+    # set style and add CMS logo
     hep.set_style(hep.style.CMS)
+
+    # create plot with curves using a single color for each value-error pair
     fig, ax = plt.subplots(1, 1)
     to_legend = []
     for i, input_path in enumerate(input_paths):
         color = next(ax._get_lines.prop_cycler)['color']
         legend = fill_plot(different_batchsizes, plotting_values[measurements[i]]["medians"],
                   plotting_values[measurements[i]]["err_down"],
-                  plotting_values[measurements[i]]["err_up"], customization_dict["filling"], measurements[i],
+                  plotting_values[measurements[i]]["err_up"], customization_dict["filling"],
                   color)  # colors["mpl_standard"][i])
         to_legend += [legend]
+    # create legend
     plt.legend(to_legend, measurements)
+
+    # apply additional parameters and improve plot style
     plt.xscale("log")
     apply_individual_customizations(customization_dict, fig, ax)
     plt.xlabel("batch size")
@@ -200,9 +138,11 @@ def plot_batchsize_several_measurements(different_batchsizes, input_paths, outpu
     ax.xaxis.set_major_locator(plt.MaxNLocator(len(different_batchsizes)))
     ax.xaxis.set_minor_locator(plt.NullLocator())
     plt.xticks(different_batchsizes, different_batchsizes)
+
+    # choose text to add on the top left of the figure
     hep.cms.text(text="Network test", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
+
+    #save plot
     fig.savefig(output_path, bbox_inches='tight')
     plt.close()
 
-# fill_between(x, y-error, y+error,
-#     alpha=0.5, edgecolor='#CC4F1B', facecolor='#FF9848')
