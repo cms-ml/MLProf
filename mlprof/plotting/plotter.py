@@ -132,17 +132,16 @@ def plot_batchsize_several_measurements(different_batchsizes, input_paths, outpu
     # apply additional parameters and improve plot style
     plt.xscale("log")
     apply_individual_customizations(customization_dict, fig, ax)
-    plt.xlabel("batch size")
-    plt.ylabel("runtime/batch size [ms]")
+    plt.xlabel("Batch size")
+    plt.ylabel("Runtime / batch size [ms]")
     plt.ylim(bottom=0)
     ax.xaxis.set_major_locator(plt.MaxNLocator(len(different_batchsizes)))
     ax.xaxis.set_minor_locator(plt.NullLocator())
     plt.xticks(different_batchsizes, different_batchsizes)
 
     # choose text to add on the top left of the figure
-    hep.cms.text(text="Network test", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
+    hep.cms.text(text="MLProf", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
 
     #save plot
     fig.savefig(output_path, bbox_inches='tight')
     plt.close()
-
