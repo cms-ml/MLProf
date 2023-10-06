@@ -172,7 +172,7 @@ configuration file, therefore this task will be run again for every change in th
 ## Parameters:
 
 - model-file: str. The absolute path of the json file containing the informations of the model to be tested.
-                   default=```$MLP_BASE/examples/model1/model.json```.
+                   default: ```$MLP_BASE/examples/model1/model.json```.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
         ```--model-file```. default: empty.
@@ -218,7 +218,7 @@ milliseconds are saved in csv format.
 - batch-size: int. the batch size to measure the runtime for; default: ```1```.
 
 - model-file: str. The absolute path of the json file containing the informations of the model to be tested.
-                   default=```$MLP_BASE/examples/model1/model.json```.
+                   default: ```$MLP_BASE/examples/model1/model.json```.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
         ```--model-file```. default: empty.
@@ -266,7 +266,7 @@ file containing the informations to plot.
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
 - model-file: str. The absolute path of the json file containing the informations of the model to be tested.
-                   default=```$MLP_BASE/examples/model1/model.json```.
+                   default: ```$MLP_BASE/examples/model1/model.json```.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
         ```--model-file```. default: empty.
@@ -312,10 +312,16 @@ plotted data point is given by ```events * repetitions```.
 - The .csv file from the ```MergeRuntimes``` task.
 
 ## Parameters:
+- log-y: bool. Plot the y-axis values logarithmically; default: ```False```.
+
+- bs-normalized: bool. Normalize the measured values with the batch size before plotting; default: ```True```.
+
+- filling: bool. Plot the errors as error bands instead of error bars; default: ```True```.
+
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
 - model-file: str. The absolute path of the json file containing the informations of the model to be tested.
-                   default=```$MLP_BASE/examples/model1/model.json```.
+                   default: ```$MLP_BASE/examples/model1/model.json```.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
         ```--model-file```. default: empty.
@@ -346,7 +352,9 @@ law run PlotRuntimes --version test_simple_dnn \
                      --model-name dnn \
                      --repetitions 500 \
                      --cmssw-version CMSSW_12_2_4 \
-                     --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+                     --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
+                     --log-y False \
+                     --bs-normalized True
 ```
 
 # PlotRuntimesSeveralNetworks
@@ -364,6 +372,12 @@ plotted data point is given by ```events * repetitions```.
 ## Parameters:
 - model-files: str. The comma-separated list of the absolute paths of the json files containing the
                     informations of the model to be tested. No default value.
+
+- log-y: bool. Plot the y-axis values logarithmically; default: ```False```.
+
+- bs-normalized: bool. Normalize the measured values with the batch size before plotting; default: ```True```.
+
+- filling: bool. Plot the errors as error bands instead of error bars; default: ```True```.
 
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
@@ -395,7 +409,9 @@ law run PlotRuntimesSeveralNetworks --version test_several_networks \
                                     --model-files $MLP_BASE/examples/model1/model.json,$MLP_BASE/examples/cnn/model_cnn.json\
                                     --repetitions 500 \
                                     --cmssw-version CMSSW_12_2_4 \
-                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
+                                    --log-y False \
+                                    --bs-normalized True
 ```
 
 # PlotRuntimesMultipleCMSSW
@@ -415,10 +431,16 @@ plotted data point is given by ```events * repetitions```.
 - cmssw-versions: str. The comma separated list of CMSSW version used for the inference.
                        default: ```"CMSSW_12_2_4","CMSSW_12_2_2"```
 
+- log-y: bool. Plot the y-axis values logarithmically; default: ```False```.
+
+- bs-normalized: bool. Normalize the measured values with the batch size before plotting; default: ```True```.
+
+- filling: bool. Plot the errors as error bands instead of error bars; default: ```True```.
+
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: ```1,2,4```.
 
 - model-file: str. The absolute path of the json file containing the informations of the model to be tested.
-                   default=```$MLP_BASE/examples/model1/model.json```.
+                   default: ```$MLP_BASE/examples/model1/model.json```.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of
         ```--model-file```. default: empty.
@@ -446,7 +468,8 @@ law run PlotRuntimesMultipleCMSSW --version test_multiple_cmssw \
                                   --cmssw-versions CMSSW_12_2_4,CMSSW_12_2_2 \
                                   --model-file $MLP_BASE/examples/model1/model.json \
                                   --repetitions 500 \
-                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
+                                  --log-y False
 ```
 
 equivalent to the brace expanded version:
@@ -456,6 +479,7 @@ law run PlotRuntimesMultipleCMSSW --version test_multiple_cmssw \
                                   --cmssw-versions "CMSSW_12_2_{2,4}" \
                                   --model-file $MLP_BASE/examples/model1/model.json \
                                   --repetitions 500 \
-                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
+                                  --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
+                                  --log-y False
 ```
 
