@@ -122,7 +122,8 @@ class BatchSizesParameters(BaseTask):
     def batch_sizes_repr(self):
         return "_".join(map(str, self.batch_sizes))
 
-class PlotCustomParameters(BaseTask):
+
+class CustomPlotParameters(BaseTask):
     """
     Parameters for customization of plotting
     """
@@ -142,4 +143,4 @@ class PlotCustomParameters(BaseTask):
 
     @property
     def custom_plot_params(self):
-        return {"log_y":self.log_y, "bs_normalized":self.bs_normalized, "filling":self.filling}
+        return {"log_y": self.log_y, "bs_normalized": self.bs_normalized, "filling": self.filling}

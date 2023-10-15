@@ -8,9 +8,9 @@ import luigi
 import law
 
 from mlprof.tasks.base import CommandTask, PlotTask, view_output_plots
-from mlprof.tasks.parameters import RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotCustomParameters
+from mlprof.tasks.parameters import RuntimeParameters, CMSSWParameters, BatchSizesParameters, CustomPlotParameters
 from mlprof.tasks.sandboxes import CMSSWSandboxTask
-from mlprof.plotting.plotter import plot_batchsize_several_measurements
+from mlprof.plotting.plotter import plot_batch_size_several_measurements
 
 
 class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
@@ -139,7 +139,7 @@ class MergeRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters):
         )
 
 
-class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, PlotCustomParameters):
+class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, CustomPlotParameters):
     """
     Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
     default are 1, 2 and 4.
@@ -151,7 +151,7 @@ class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, Plo
         return MergeRuntimes.req(self)
 
     def output(self):
-        return self.local_target(f"runtime_plot_different_batchsizes_{self.batch_sizes_repr}.pdf")
+        return self.local_target(f"runtime_plot_different_batch_sizes_{self.batch_sizes_repr}.pdf")
 
     @view_output_plots
     def run(self):
@@ -164,11 +164,16 @@ class PlotRuntimes(RuntimeParameters, CMSSWParameters, BatchSizesParameters, Plo
         network_name = model_data["network_name"]
 
         # create the plot
-        plot_batchsize_several_measurements(self.batch_sizes, [self.input().path], output.path, [network_name], self.custom_plot_params)
+        plot_batch_size_several_measurements(self.batch_sizes, [self.input().path], output.path, [network_name],
+                                            self.custom_plot_params)
         print("plot saved")
 
 
-class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, PlotCustomParameters):
+class PlotRuntimesMultipleNetworks(RuntimeParameters,
+                                  CMSSWParameters,
+                                  BatchSizesParameters,
+                                  PlotTask,
+                                  CustomPlotParameters):
     """
     Task to plot the results from the runtime measurements for several networks, depending on the batch sizes
     given as parameters, default are 1, 2 and 4.
@@ -177,7 +182,7 @@ class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizes
     sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
 
     model_files = law.CSVParameter(
-        description="comma-separated list of json files containing information of models to be tested"
+        description="comma-separated list of json files containing information of models to be tested",
     )
 
     def requires(self):
@@ -189,7 +194,7 @@ class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizes
             model_data = law.LocalFileTarget(model_file).load(formatter="json")
             network_names += [model_data["network_name"]]
         network_names_repr = "_".join(network_names)
-        return self.local_target(f"runtime_plot_networks_{network_names_repr}_different_batchsizes_{self.batch_sizes_repr}.pdf")
+        return self.local_target(f"runtime_plot_networks_{network_names_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf")  # noqa
 
     @view_output_plots
     def run(self):
@@ -205,12 +210,16 @@ class PlotRuntimesSeveralNetworks(RuntimeParameters, CMSSWParameters, BatchSizes
             network_names += [model_data["network_name"]]
         for input_task in self.input():
             input_paths += [input_task.path]
-        plot_batchsize_several_measurements(self.batch_sizes, input_paths,
+        plot_batch_size_several_measurements(self.batch_sizes, input_paths,
                                         output.path, network_names, self.custom_plot_params)
         print("plot saved")
 
 
-class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesParameters, PlotTask, PlotCustomParameters):
+class PlotRuntimesMultipleCMSSW(RuntimeParameters,
+                                CMSSWParameters,
+                                BatchSizesParameters,
+                                PlotTask,
+                                CustomPlotParameters):
     """
     Task to plot the results from the runtime measurements for inferences performed in multiple cmssw versions,
     depending on the batch sizes given as parameters, default are 1, 2 and 4.
@@ -220,7 +229,7 @@ class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesPa
 
     cmssw_versions = law.CSVParameter(
         cls=luigi.Parameter,
-        default=("CMSSW_12_2_4","CMSSW_12_2_2"),
+        default=("CMSSW_12_2_4", "CMSSW_12_2_2"),
         description="comma-separated list of CMSSW versions; default: ('CMSSW_12_2_4','CMSSW_12_2_2')",
         brace_expand=True,
     )
@@ -230,7 +239,7 @@ class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesPa
 
     def output(self):
         cmssw_versions_repr = "_".join(self.cmssw_versions)
-        return self.local_target(f"runtime_plot__multiple_cmssw_{cmssw_versions_repr}_different_batchsizes_{self.batch_sizes_repr}.pdf")
+        return self.local_target(f"runtime_plot_multiple_cmssw_{cmssw_versions_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf")  # noqa
 
     @view_output_plots
     def run(self):
@@ -242,7 +251,6 @@ class PlotRuntimesMultipleCMSSW(RuntimeParameters, CMSSWParameters, BatchSizesPa
         input_paths = []
         for input_task in self.input():
             input_paths += [input_task.path]
-        from IPython import embed; embed()
-        plot_batchsize_several_measurements(self.batch_sizes, input_paths,
+        plot_batch_size_several_measurements(self.batch_sizes, input_paths,
                                         output.path, self.cmssw_versions, self.custom_plot_params)
         print("plot saved")

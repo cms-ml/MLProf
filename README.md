@@ -45,7 +45,7 @@ flowchart TD
     B --> |merge the results for different batch sizes| C[MergeRuntimes]
     C --> D[PlotRuntimes]
     C --> E[PlotRuntimesMultipleCMSSW]
-    C --> F[PlotRuntimesSeveralNetworks]
+    C --> F[PlotRuntimesMultipleNetworks]
 ```
 
 A task is run with the command ```law run``` followed by the name of the task.
@@ -109,7 +109,7 @@ flowchart TD
     B --> |merge the results for different batch sizes| C[MergeRuntimes]
     C --> D[PlotRuntimes]
     C --> E[PlotRuntimesMultipleCMSSW]
-    C --> F[PlotRuntimesSeveralNetworks]
+    C --> F[PlotRuntimesMultipleNetworks]
 ```
 
 It is composed of four major types of tasks:
@@ -123,7 +123,7 @@ single batch size and outputs a .csv file with the results of the timing measure
 3. [MergeRuntimes](#mergeruntimes): This task merges the .csv output files with the required multiple batch sizes
 from the [MeasureRuntime](#measureruntime) tasks to obtain a single .csv file containing the informations to plot.
 
-4. [PlotRuntimes](#plotruntimes), [PlotRuntimesSeveralNetworks](#plotruntimesseveralnetworks),
+4. [PlotRuntimes](#plotruntimes), [PlotRuntimesMultipleNetworks](#plotruntimesseveralnetworks),
 [PlotRuntimesMultipleCMSSW](#plotruntimesmultiplecmssw): These tasks create the plots with the values stored in the
 .csv file from [MergeRuntimes](#mergeruntimes).
 
@@ -159,7 +159,7 @@ The format of the file to give to MLProf is the following:
         },
         ...
     ],
-    "network_name": "{name_of_the_network_for_the_legend_of_the_plots_and_the_name_of_the_output_pdf_of_PlotRuntimesSeveralNetworks}"
+    "network_name": "{name_of_the_network_for_the_legend_of_the_plots_and_the_name_of_the_output_pdf_of_PlotRuntimesMultipleNetworks}"
 }
 ```
 There are already a few examples of these configswith working paths for the networks in the "examples" folder.
@@ -343,7 +343,7 @@ plotted data point is given by ```events * repetitions```.
 - scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```runtime_plot_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
+- ```runtime_plot_different_batch_sizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
 against the different batch sizes given.
 
 ## Example:
@@ -359,7 +359,7 @@ law run PlotRuntimes --version test_simple_dnn \
                      --bs-normalized True
 ```
 
-# PlotRuntimesSeveralNetworks
+# PlotRuntimesMultipleNetworks
 
 This task plots the results of the runtime measurement against the given batch sizes for several models.
 The model-files argument is required and replaces the module-file argument. The points are
@@ -401,19 +401,19 @@ plotted data point is given by ```events * repetitions```.
 - scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```runtime_plot_networks_{network_name_1}_{network_name_2}_{...}_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
+- ```runtime_plot_networks_{network_name_1}_{network_name_2}_{...}_different_batch_sizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
 against the different batch sizes given.
 
 ## Example:
 
 ```shell
-law run PlotRuntimesSeveralNetworks --version test_several_networks \
-                                    --model-files $MLP_BASE/examples/model1/model.json,$MLP_BASE/examples/cnn/model_cnn.json\
-                                    --repetitions 500 \
-                                    --cmssw-version CMSSW_12_2_4 \
-                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
-                                    --log-y False \
-                                    --bs-normalized True
+law run PlotRuntimesMultipleNetworks --version test_several_networks \
+                                     --model-files $MLP_BASE/examples/model1/model.json,$MLP_BASE/examples/cnn/model_cnn.json\
+                                     --repetitions 500 \
+                                     --cmssw-version CMSSW_12_2_4 \
+                                     --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
+                                     --log-y False \
+                                     --bs-normalized True
 ```
 
 # PlotRuntimesMultipleCMSSW
@@ -460,7 +460,7 @@ plotted data point is given by ```events * repetitions```.
 - scram-arch: str. The SCRAM architecture used for the inference. default: ```slc7_amd64_gcc10```
 
 ## Output:
-- ```runtime_plot__multiple_cmssw_{cmssw_version_1}_{cmssw_version_2}_{...}_different_batchsizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
+- ```runtime_plot__multiple_cmssw_{cmssw_version_1}_{cmssw_version_2}_{...}_different_batch_sizes_{batch_size_1}_{batch_size_2}_{...}.pdf```: The plot of the runtime measurement
 against the different batch sizes given.
 
 ## Example:
