@@ -325,13 +325,13 @@ void MyPluginRuntime::analyze(const edm::Event& event,
       std::chrono::duration<float> runtime_in_seconds = (end - start);
 
       if (r >= nWarmUps) {
-        std::cout << "Current epoch: " << r - nWarmUps + 1 << std::endl;
+        // std::cout << "Current epoch: " << r - nWarmUps + 1 << std::endl;
         // conver runtimes to milli seconds
         runtimes.push_back(runtime_in_seconds.count() * 1000);
-        std::cout << "Corresponding runtime: "
-                  << runtime_in_seconds.count() * 1000 << " ms" << std::endl;
+        // std::cout << "Corresponding runtime: "
+        //          << runtime_in_seconds.count() * 1000 << " ms" << std::endl;
       } else {
-        std::cout << "Current warm-up epoch: " << r + 1 << std::endl;
+        // std::cout << "Current warm-up epoch: " << r + 1 << std::endl;
         continue;
       }
     }
@@ -344,7 +344,7 @@ void MyPluginRuntime::analyze(const edm::Event& event,
     std_runtimes.push_back(std_runtime);
 
     // save time performance not divided by batch size
-    std::cout << "begin writing file" << std::endl;
+    std::cout << "measurement done, begin writing file" << std::endl;
     writeFileWholeVector(batchSize, runtimes, filenameOutputCsv_);
     std::cout << "file written" << std::endl;
   }
