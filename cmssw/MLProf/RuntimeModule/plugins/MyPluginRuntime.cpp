@@ -313,9 +313,9 @@ void MyPluginRuntime::analyze(const edm::Event& event,
     }
 
     // run and measure time
-    int nRuns = nRuns_;  // default 500
+    int nRuns = nRuns_;
     std::vector<float> runtimes;
-    int nWarmUps = nWarmUps_;  // default 50
+    int nWarmUps = nWarmUps_;
     for (int r = 0; r < nRuns + nWarmUps; r++) {
       auto start = std::chrono::high_resolution_clock::now();
       // run the graph with given inputs and outputs
@@ -335,7 +335,7 @@ void MyPluginRuntime::analyze(const edm::Event& event,
         continue;
       }
     }
-    // calculate metrices
+    // calculate metrics
     float mean_runtime = 0;
     float std_runtime = 0;
     std::tie(mean_runtime, std_runtime) = mean_and_std(runtimes);
@@ -343,19 +343,10 @@ void MyPluginRuntime::analyze(const edm::Event& event,
     mean_runtimes.push_back(mean_runtime);
     std_runtimes.push_back(std_runtime);
 
-    // save performance not divided by batch size
-    // writeFile(batchSize, mean_runtime, std_runtime, filenameOutputCsv_);
+    // save time performance not divided by batch size
     std::cout << "begin writing file" << std::endl;
-    // auto start_writing = std::chrono::high_resolution_clock::now();
     writeFileWholeVector(batchSize, runtimes, filenameOutputCsv_);
-    // auto end_writing = std::chrono::high_resolution_clock::now();
     std::cout << "file written" << std::endl;
-    // std::chrono::duration<float> writing_time = (end_writing -
-    // start_writing); std::chrono::milliseconds writing_time_ms =
-    // std::chrono::duration_cast< std::chrono::milliseconds >( writing_time );
-    // std::cout << "time taken:" << writing_time.count() << "s" << std::endl;
-    // std::cout << "time taken:" << writing_time_ms.count() << "ms" <<
-    // std::endl;
   }
 }
 
