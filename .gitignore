@@ -14,7 +14,6 @@
 *.hdf5
 *.json
 *.yaml
-*.pb
 *.out
 *.parquet
 .coverage

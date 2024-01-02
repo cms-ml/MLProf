@@ -9,8 +9,7 @@ from mlprof.tasks.parameters import CMSSWParameters
 
 class CMSSWSandboxTask(CMSSWParameters):
     """
-    TODO:
-        - move to base (or even better: a different name)
+    Base class for tasks in cmssw sandboxes.
     """
 
     @property

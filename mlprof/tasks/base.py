@@ -27,9 +27,9 @@ class BaseTask(law.SandboxTask):
 
     def store_parts(self):
         """
-        Returns a :py:class:`law.util.InsertableDict` whose values are used to create a store path.
-        For instance, the parts ``{"keyA": "a", "keyB": "b", 2: "c"}`` lead to the path "a/b/c". The
-        keys can be used by subclassing tasks to overwrite values.
+        Returns a :py:class:`law.util.InsertableDict` whose values are used to create a store path. For instance, the
+        parts ``{"keyA": "a", "keyB": "b", 2: "c"}`` lead to the path "a/b/c". The keys can be used by subclassing tasks
+        to overwrite values.
         """
         parts = law.util.InsertableDict()
 
@@ -44,8 +44,8 @@ class BaseTask(law.SandboxTask):
 
     def local_path(self, *path, **kwargs):
         """
-        Joins path fragments from *store* (defaulting to :py:attr:`default_store`), *store_parts()*
-        and *path* and returns the joined path.
+        Joins path fragments from *store* (defaulting to :py:attr:`default_store`), :py:meth:`store_parts` and *path*,
+        and returns the joined path.
         """
         # determine the main store directory
         store = "$MLP_STORE_LOCAL"
@@ -58,8 +58,8 @@ class BaseTask(law.SandboxTask):
 
     def local_target(self, *path, **kwargs):
         """ local_target(*path, dir=False, **kwargs)
-        Creates either a local file or directory target, depending on *dir*, forwarding all *path*
-        fragments and *store* to :py:meth:`local_path` and all *kwargs* the respective target class.
+        Creates either a local file or directory target, depending on *dir*, forwarding all *path* fragments and *store*
+        to :py:meth:`local_path` and all *kwargs* the respective target class.
         """
         # select the target class
         cls = law.LocalDirectoryTarget if kwargs.pop("dir", False) else law.LocalFileTarget
@@ -73,8 +73,8 @@ class BaseTask(law.SandboxTask):
 
 class CommandTask(BaseTask):
     """
-    A task that provides convenience methods to work with shell commands, i.e., printing them on the
-    command line and executing them with error handling.
+    A task that provides convenience methods to work with shell commands, i.e., printing them on the command line and
+    executing them with error handling.
     """
 
     print_command = law.CSVParameter(
@@ -102,7 +102,7 @@ class CommandTask(BaseTask):
 
         max_depth = int(args[0])
 
-        print("print task commands with max_depth {}".format(max_depth))
+        print(f"print task commands with max_depth {max_depth}")
         print("")
 
         # get the format chars
@@ -140,7 +140,7 @@ class CommandTask(BaseTask):
             task_offset = offset
             if depth > 0:
                 task_offset += fmt["l" if is_last else "t"] + fmt["ind"] * fmt["-"]
-            task_prefix = "{} {} ".format(depth, fmt[">"])
+            task_prefix = f"{depth} {fmt['>']} "
 
             # determine text offset and prefix
             text_offset = offset
@@ -162,7 +162,7 @@ class CommandTask(BaseTask):
             text = law.util.colored("command", style="bright")
             if isinstance(dep, law.BaseWorkflow) and dep.is_workflow():
                 dep = dep.as_branch(0)
-                text += " (from branch {})".format(law.util.colored("0", "red"))
+                text += f" (from branch {law.util.colored('0', 'red')})"
             text += ": "
 
             cmd = dep.build_command()
@@ -211,10 +211,10 @@ class CommandTask(BaseTask):
             tmp_dir = law.LocalDirectoryTarget(is_tmp=True)
             tmp_dir.touch()
             kwargs["cwd"] = tmp_dir.path
-        self.publish_message("cwd: {}".format(kwargs.get("cwd", os.getcwd())))
+        self.publish_message(f"cwd: {kwargs.get('cwd', os.getcwd())}")
 
         # call it
-        with self.publish_step("running '{}' ...".format(law.util.colored(cmd, "cyan"))):
+        with self.publish_step(f"running '{law.util.colored(cmd, 'cyan')}' ..."):
             p, lines = law.util.readable_popen(cmd, shell=True, executable="/bin/bash", **kwargs)
             for line in lines:
                 print(line)
@@ -258,22 +258,22 @@ class PlotTask(BaseTask):
     )
     plot_postfix = luigi.Parameter(
         default=law.NO_STR,
-        description="an arbitrary postfix that is added with two underscores to all paths of "
-        "produced plots; default: empty",
+        description="an arbitrary postfix that is added with two underscores to all paths of produced plots; "
+        "default: empty",
     )
     view_cmd = luigi.Parameter(
         default=law.NO_STR,
         significant=False,
-        description="a command to execute after the task has run to visualize plots right in the "
-        "terminal; default: empty",
+        description="a command to execute after the task has run to visualize plots right in the terminal; "
+        "default: empty",
     )
 
     def create_plot_names(self, parts):
         plot_file_types = ["pdf", "png", "root", "c", "eps"]
         if any(t not in plot_file_types for t in self.file_types):
-            raise Exception("plot names only allowed for file types {}, got {}".format(
-                ",".join(plot_file_types), ",".join(self.file_types),
-            ))
+            raise Exception(
+                f"plot names only allowed for file types {','.join(plot_file_types)}, got {','.join(self.file_types)}",
+            )
 
         if self.plot_postfix and self.plot_postfix != law.NO_STR:
             parts.append((self.plot_postfix,))
@@ -314,7 +314,7 @@ def view_output_plots(fn, opts, task, *args, **kwargs):
 
         # loop through targets and view them
         for target in view_targets.values():
-            task.publish_message("showing {}".format(target.path))
+            task.publish_message(f"showing {target.path}")
             with target.localize("r") as tmp:
                 law.util.interruptable_popen(
                     view_cmd.format(tmp.path),
