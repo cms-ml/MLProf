@@ -167,9 +167,6 @@ tensorflow::Tensor TFRuntime::createInputTensor(int rank, std::vector<int> shape
     *data = inputType_ == mlprof::InputType::Incremental ? float(i) : drawNormal();
   }
 
-  // print the tensor meta data
-  std::cout << "tensor: " << tensor.DebugString() << std::endl;
-
   return tensor;
 }
 
