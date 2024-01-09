@@ -273,3 +273,66 @@ class PlotRuntimesMultipleCMSSW(
             self.cmssw_versions,
             self.custom_plot_params,
         )
+
+
+class PlotRuntimesMultipleParams(RuntimeParameters,
+                                 CMSSWParameters,
+                                 BatchSizesParameters,
+                                 PlotTask,
+                                 CustomPlotParameters):
+    """
+    Task to plot the results from the runtime measurements for several parameters, e.g. networks
+    or cmssw versions, depending on the batch sizes
+    given as parameters, default are 1, 2 and 4.
+    """
+
+    sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
+
+    model_files = law.CSVParameter(
+        description="comma-separated list of json files containing information of models to be tested",
+    )
+
+    cmssw_versions = law.CSVParameter(
+        cls=luigi.Parameter,
+        default=("CMSSW_12_2_4", "CMSSW_12_2_2"),
+        description="comma-separated list of CMSSW versions; default: ('CMSSW_12_2_4','CMSSW_12_2_2')",
+        brace_expand=True,
+    )
+
+    def requires(self):
+        import itertools
+        all_params = list(itertools.product(self.model_files, self.cmssw_versions))
+        return [MergeRuntimes.req(self, model_file=params[0], cmssw_version=params[1]) for params in all_params]
+
+    def output(self):
+        all_params = self.factorize_params()
+        all_params_list = ["_".join(all_params_item) for all_params_item in all_params]
+        all_params_repr = "_".join(all_params_list)
+        return self.local_target(f"runtime_plot_params_{all_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf")  # noqa
+
+    def factorize_params(self):
+        import itertools
+        # get additional parameters plotting
+        network_names = []
+        for model_file in self.model_files:
+            model_data = law.LocalFileTarget(model_file).load(formatter="json")
+            network_names += [model_data["network_name"]]
+
+        # combine all parameters together
+        all_params = list(itertools.product(network_names, self.cmssw_versions))
+        return all_params
+
+    @view_output_plots
+    def run(self):
+
+        # prepare the output directory
+        output = self.output()
+        output.parent.touch()
+
+        input_paths = [inp.path for inp in self.input()]
+        print(input_paths)
+        all_params = self.factorize_params()
+
+        # create the plot
+        plot_batch_size_several_measurements(self.batch_sizes, input_paths,
+                                        output.path, all_params, self.custom_plot_params)

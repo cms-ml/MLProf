@@ -103,6 +103,8 @@ def plot_batch_size_several_measurements(different_batch_sizes, input_paths, out
     import matplotlib.pyplot as plt
     import mplhep as hep
 
+    measurements_paths_strs = ["_".join(measurement) for measurement in measurements]
+    measurements_labels_strs = [", ".join(measurement) for measurement in measurements]
     # get the values to be plotted
     plotting_values = {}
     for i, input_path in enumerate(input_paths):
@@ -111,7 +113,7 @@ def plot_batch_size_several_measurements(different_batch_sizes, input_paths, out
             medians = medians / different_batch_sizes
             err_down = err_down / different_batch_sizes
             err_up = err_up / different_batch_sizes
-        plotting_values[measurements[i]] = {"medians": medians, "err_down": err_down, "err_up": err_up}
+        plotting_values[measurements_paths_strs[i]] = {"medians": medians, "err_down": err_down, "err_up": err_up}
 
     # set style and add CMS logo
     hep.set_style(hep.style.CMS)
@@ -119,15 +121,15 @@ def plot_batch_size_several_measurements(different_batch_sizes, input_paths, out
     # create plot with curves using a single color for each value-error pair
     fig, ax = plt.subplots(1, 1)
     to_legend = []
-    for i, input_path in enumerate(input_paths):
+    for i in range(0, len(measurements_paths_strs)):
         color = next(ax._get_lines.prop_cycler)["color"]
-        legend = fill_plot(different_batch_sizes, plotting_values[measurements[i]]["medians"],
-                  plotting_values[measurements[i]]["err_down"],
-                  plotting_values[measurements[i]]["err_up"], customization_dict["filling"],
+        legend = fill_plot(different_batch_sizes, plotting_values[measurements_paths_strs[i]]["medians"],
+                  plotting_values[measurements_paths_strs[i]]["err_down"],
+                  plotting_values[measurements_paths_strs[i]]["err_up"], customization_dict["filling"],
                   color)  # colors["mpl_standard"][i])
         to_legend += [legend]
     # create legend
-    plt.legend(to_legend, measurements)
+    plt.legend(to_legend, measurements_labels_strs)
 
     # apply additional parameters and improve plot style
     plt.xscale("log")
