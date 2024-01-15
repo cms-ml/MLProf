@@ -52,7 +52,7 @@ class RuntimeParameters(BaseTask):
     )
     input_type = luigi.Parameter(
         default="random",
-        description="either 'random', 'incremental', or a path to a root file; default: random",
+        description="either 'random', 'incremental', 'zeros', or a path to a root file; default: random",
     )
     n_events = luigi.IntParameter(
         default=1,
@@ -68,11 +68,11 @@ class RuntimeParameters(BaseTask):
 
         # verify the input type
         self.input_file = None
-        if self.input_type not in ("random", "incremental"):
+        if self.input_type not in ("random", "incremental", "zeros"):
             self.input_file = os.path.abspath(os.path.expandvars(os.path.expanduser(self.input_type)))
             if not os.path.exists(self.input_file):
                 raise ValueError(
-                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor a path to an existing "
+                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor a path to an existing "
                     f"root file",
                 )
 
@@ -144,7 +144,13 @@ class CustomPlotParameters(BaseTask):
         default=True,
         description="plot the errors as error bands instead of error bars; default: True",
     )
+    top_right_label = luigi.Parameter(
+        default="",
+        description="stick a label over the top right corner of the plot",
+    )
 
     @property
     def custom_plot_params(self):
-        return {"log_y": self.log_y, "bs_normalized": self.bs_normalized, "filling": self.filling}
+        return {"log_y": self.log_y, "bs_normalized": self.bs_normalized, "filling": self.filling,
+                "top_right_label": self.top_right_label,
+                }

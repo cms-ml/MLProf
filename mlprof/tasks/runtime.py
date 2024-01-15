@@ -5,6 +5,7 @@ Collection of test tasks.
 """
 
 import os
+import itertools
 
 import luigi
 import law
@@ -275,11 +276,13 @@ class PlotRuntimesMultipleCMSSW(
         )
 
 
-class PlotRuntimesMultipleParams(RuntimeParameters,
-                                 CMSSWParameters,
-                                 BatchSizesParameters,
-                                 PlotTask,
-                                 CustomPlotParameters):
+class PlotRuntimesMultipleParams(
+    RuntimeParameters,
+    CMSSWParameters,
+    BatchSizesParameters,
+    PlotTask,
+    CustomPlotParameters,
+):
     """
     Task to plot the results from the runtime measurements for several parameters, e.g. networks
     or cmssw versions, depending on the batch sizes
@@ -290,28 +293,31 @@ class PlotRuntimesMultipleParams(RuntimeParameters,
 
     model_files = law.CSVParameter(
         description="comma-separated list of json files containing information of models to be tested",
+        default=None,
     )
 
     cmssw_versions = law.CSVParameter(
         cls=luigi.Parameter,
-        default=("CMSSW_12_2_4", "CMSSW_12_2_2"),
+        default=None,
         description="comma-separated list of CMSSW versions; default: ('CMSSW_12_2_4','CMSSW_12_2_2')",
         brace_expand=True,
     )
 
+    # create params_to_write if model_files or cmssw_versions is None? -> gets difficult with itertools product if only one param is changed
+
     def requires(self):
-        import itertools
+        self.fill_undefined_param_values()
         all_params = list(itertools.product(self.model_files, self.cmssw_versions))
         return [MergeRuntimes.req(self, model_file=params[0], cmssw_version=params[1]) for params in all_params]
 
     def output(self):
+        self.fill_undefined_param_values()
         all_params = self.factorize_params()
         all_params_list = ["_".join(all_params_item) for all_params_item in all_params]
         all_params_repr = "_".join(all_params_list)
         return self.local_target(f"runtime_plot_params_{all_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf")  # noqa
 
     def factorize_params(self):
-        import itertools
         # get additional parameters plotting
         network_names = []
         for model_file in self.model_files:
@@ -322,12 +328,20 @@ class PlotRuntimesMultipleParams(RuntimeParameters,
         all_params = list(itertools.product(network_names, self.cmssw_versions))
         return all_params
 
+    def fill_undefined_param_values(self):
+        if self.model_files is None:
+            self.model_files = tuple(self.model_file)
+
+        if self.cmssw_versions is None:
+            self.cmssw_versions = tuple(self.cmssw_version)
+
     @view_output_plots
     def run(self):
-
         # prepare the output directory
         output = self.output()
         output.parent.touch()
+
+        self.fill_undefined_param_values()
 
         input_paths = [inp.path for inp in self.input()]
         print(input_paths)

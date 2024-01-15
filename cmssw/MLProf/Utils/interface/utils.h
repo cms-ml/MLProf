@@ -13,6 +13,7 @@ namespace mlprof {
 enum InputType {
   Incremental,
   Random,
+  Zeros,
 };
 
 void writeRuntimes(const std::string& path, float batchSize, std::vector<float> runtimes) {

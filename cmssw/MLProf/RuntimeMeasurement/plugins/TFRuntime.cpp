@@ -115,9 +115,6 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
     if (rank < 1) {
       throw cms::Exception("InvalidRank") << "only ranks above 0 are supported, got " << rank;
     }
-    if (rank > 3) {
-      throw cms::Exception("InvalidRank") << "only ranks up to 3 are supported, got " << rank;
-    }
   }
   // the sum of ranks must match the number of flat input sizes
   if (std::accumulate(inputRanks_.begin(), inputRanks_.end(), 0) != (int)flatInputSizes_.size()) {
@@ -141,9 +138,11 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
     inputType_ = mlprof::InputType::Incremental;
   } else if (inputTypeStr_ == "random") {
     inputType_ = mlprof::InputType::Random;
+  } else if (inputTypeStr_ == "zeros") {
+    inputType_ = mlprof::InputType::Zeros;
   } else {
     throw cms::Exception("InvalidInputType")
-        << "input type must be either 'incremental' or 'random', got " << inputTypeStr_;
+        << "input type must be either 'incremental', 'zeros' or 'random', got " << inputTypeStr_;
   }
 }
 
@@ -164,7 +163,9 @@ tensorflow::Tensor TFRuntime::createInputTensor(int rank, std::vector<int> shape
   // fill it
   float* data = tensor.flat<float>().data();
   for (int i = 0; i < tensor.NumElements(); i++, data++) {
-    *data = inputType_ == mlprof::InputType::Incremental ? float(i) : drawNormal();
+    *data = inputType_ == mlprof::InputType::Incremental ? float(i) :
+    inputType_ == mlprof::InputType::Zeros ? float(0) :
+    drawNormal();
   }
 
   return tensor;
@@ -199,7 +200,8 @@ void TFRuntime::analyze(const edm::Event& event, const edm::EventSetup& setup) {
       auto start = std::chrono::high_resolution_clock::now();
       tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
       auto end = std::chrono::high_resolution_clock::now();
-      runtimes.push_back((end - start).count() * 1000);
+      std::chrono::duration<float> runtime_in_seconds = (end - start);
+      runtimes.push_back(runtime_in_seconds.count() * 1000);
     }
 
     // save them

@@ -103,8 +103,12 @@ def plot_batch_size_several_measurements(different_batch_sizes, input_paths, out
     import matplotlib.pyplot as plt
     import mplhep as hep
 
-    measurements_paths_strs = ["_".join(measurement) for measurement in measurements]
-    measurements_labels_strs = [", ".join(measurement) for measurement in measurements]
+    if type(measurements[0]) == str:
+        measurements_paths_strs = measurements
+        measurements_labels_strs = measurements
+    else:
+        measurements_paths_strs = ["_".join(measurement) for measurement in measurements]
+        measurements_labels_strs = [", ".join(measurement) for measurement in measurements]
     # get the values to be plotted
     plotting_values = {}
     for i, input_path in enumerate(input_paths):
@@ -146,7 +150,7 @@ def plot_batch_size_several_measurements(different_batch_sizes, input_paths, out
 
     # choose text to add on the top left of the figure
     hep.cms.text(text="MLProf", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
-
+    hep.cms.lumitext(text=customization_dict["top_right_label"])
     # save plot
     fig.savefig(output_path, bbox_inches="tight")
     plt.close()
