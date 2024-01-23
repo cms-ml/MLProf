@@ -1,5 +1,5 @@
 {
-    "file": "simple_dnn.pb",
+    "file": "simple_dnn.onnx",
     "inputs": [
         {
             "name": "input_0",
@@ -8,9 +8,9 @@
     ],
     "outputs": [
         {
-            "name": "Identity"
+            "name": "output_0"
         }
     ],
-    "network_name": "dnn",
-    "inference_engine": "tf"
+    "network_name": "dnn_onnx",
+    "inference_engine": "onnx"
 }

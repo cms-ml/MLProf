@@ -11,5 +11,6 @@
             "name": "Identity"
         }
     ],
-    "network_name": "cnn"
+    "network_name": "cnn",
+    "inference_engine": "tf"
 }

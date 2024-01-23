@@ -15,5 +15,6 @@
             "name": "Identity"
         }
     ],
-    "network_name": "dnn_2_inputs"
+    "network_name": "dnn_2_inputs",
+    "inference_engine": "tf"
 }

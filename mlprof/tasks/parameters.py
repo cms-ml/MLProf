@@ -72,8 +72,8 @@ class RuntimeParameters(BaseTask):
             self.input_file = os.path.abspath(os.path.expandvars(os.path.expanduser(self.input_type)))
             if not os.path.exists(self.input_file):
                 raise ValueError(
-                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor a path to an existing "
-                    f"root file",
+                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor "
+                    f"a path to an existing root file",
                 )
 
         # cached model content

@@ -75,9 +75,14 @@ class CreateRuntimeConfig(RuntimeParameters, CMSSWParameters):
         }
 
         # load the template content
-        template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/tf_runtime_template_cfg.py"
-        content = law.LocalFileTarget(template).load(formatter="text")
+        if self.model_data["inference_engine"] == "tf":
+            template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/tf_runtime_template_cfg.py"
+        elif self.model_data["inference_engine"] == "onnx":
+            template = "$MLP_BASE/cmssw/MLProf/ONNXRuntimeModule/test/onnx_runtime_template_cfg.py"
+        else:
+            raise Exception("The only inference_engine supported are 'tf' and 'onnx'")
 
+        content = law.LocalFileTarget(template).load(formatter="text")
         # replace variables
         for key, value in template_vars.items():
             content = content.replace(f"__{key}__", str(value))
@@ -299,11 +304,14 @@ class PlotRuntimesMultipleParams(
     cmssw_versions = law.CSVParameter(
         cls=luigi.Parameter,
         default=None,
-        description="comma-separated list of CMSSW versions; default: ('CMSSW_12_2_4','CMSSW_12_2_2')",
+        description="comma-separated list of CMSSW versions; default: (self.cmssw_version,)",
         brace_expand=True,
     )
 
-    # create params_to_write if model_files or cmssw_versions is None? -> gets difficult with itertools product if only one param is changed
+    params_to_write = []
+
+    # create params_to_write for labels if model_files or cmssw_versions is None? ->
+    # gets difficult with itertools product if only one param is changed
 
     def requires(self):
         self.fill_undefined_param_values()
@@ -312,28 +320,43 @@ class PlotRuntimesMultipleParams(
 
     def output(self):
         self.fill_undefined_param_values()
+        self.fill_params_to_write()
         all_params = self.factorize_params()
         all_params_list = ["_".join(all_params_item) for all_params_item in all_params]
         all_params_repr = "_".join(all_params_list)
         return self.local_target(f"runtime_plot_params_{all_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf")  # noqa
 
+    def fill_params_to_write(self):
+        if self.params_to_write == []:
+            for param in [self.model_files, self.cmssw_versions]:
+                if len(param) > 1:
+                    if param is self.model_files:
+                        network_names = []
+                        for model_file in self.model_files:
+                            model_data = law.LocalFileTarget(model_file).load(formatter="json")
+                            network_names += [model_data["network_name"]]
+                        self.params_to_write += [tuple(network_names)]
+                    else:
+                        self.params_to_write += [param]
+
     def factorize_params(self):
-        # get additional parameters plotting
-        network_names = []
-        for model_file in self.model_files:
-            model_data = law.LocalFileTarget(model_file).load(formatter="json")
-            network_names += [model_data["network_name"]]
+        # # get additional parameters plotting
+        # network_names = []
+        # for model_file in self.model_files:
+        #     model_data = law.LocalFileTarget(model_file).load(formatter="json")
+        #     network_names += [model_data["network_name"]]
 
         # combine all parameters together
-        all_params = list(itertools.product(network_names, self.cmssw_versions))
+        # all_params = list(itertools.product(network_names, self.cmssw_version))
+        all_params = list(itertools.product(*self.params_to_write))
         return all_params
 
     def fill_undefined_param_values(self):
-        if self.model_files is None:
-            self.model_files = tuple(self.model_file)
+        if self.model_files[0] is None:
+            self.model_files = (self.model_file,)
 
-        if self.cmssw_versions is None:
-            self.cmssw_versions = tuple(self.cmssw_version)
+        if self.cmssw_versions[0] is None:
+            self.cmssw_versions = (self.cmssw_version,)
 
     @view_output_plots
     def run(self):
@@ -342,9 +365,9 @@ class PlotRuntimesMultipleParams(
         output.parent.touch()
 
         self.fill_undefined_param_values()
+        self.fill_params_to_write()
 
         input_paths = [inp.path for inp in self.input()]
-        print(input_paths)
         all_params = self.factorize_params()
 
         # create the plot

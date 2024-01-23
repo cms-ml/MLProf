@@ -110,7 +110,7 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
   if ((int)inputRanks_.size() != nInputs_) {
     throw cms::Exception("InvalidInputRanks") << "number of input ranks must match number of input tensors";
   }
-  // input ranks below 1 and above 3 are not supported
+  // the input must be at least 1 dimensional
   for (auto rank : inputRanks_) {
     if (rank < 1) {
       throw cms::Exception("InvalidRank") << "only ranks above 0 are supported, got " << rank;
@@ -127,7 +127,7 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
       throw cms::Exception("InvalidBatchSize") << "batch sizes must be positive, got " << batchSize;
     }
   }
-  // input sizes must be postitive
+  // input sizes must be positive
   for (auto size : flatInputSizes_) {
     if (size < 1) {
       throw cms::Exception("InvalidInputSize") << "input sizes must be positive, got " << size;
