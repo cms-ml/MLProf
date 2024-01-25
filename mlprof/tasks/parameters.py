@@ -185,8 +185,8 @@ class ModelParameters(BaseTask):
 #     )
 #     model_labels = luigi.Parameter(
 #         default=law.NO_STR,
-#         description="when set, use this label in plots; when empty, the 'network_name' field in the model json data is "
-#         "used when existing, and full_model_name otherwise; default: empty",
+#         description="when set, use this label in plots; when empty, the 'network_name' field in the "
+#         "model json data is used when existing, and full_model_name otherwise; default: empty",
 #     )
 
 #     def __init__(self, *args, **kwargs):
