@@ -12,7 +12,8 @@ import law
 
 from mlprof.tasks.base import CommandTask, PlotTask, view_output_plots
 from mlprof.tasks.parameters import (
-    RuntimeParameters, ModelParameters, CMSSWParameters, BatchSizesParameters, CustomPlotParameters,
+    RuntimeParameters, ModelParameters, MultiModelParameters, CMSSWParameters, BatchSizesParameters,
+    CustomPlotParameters,
 )
 from mlprof.tasks.sandboxes import CMSSWSandboxTask
 from mlprof.plotting.plotter import plot_batch_size_several_measurements
@@ -176,16 +177,12 @@ class PlotRuntimes(
         output = self.output()
         output.parent.touch()
 
-        # get name network for legend
-        model_data = self.model_data
-        network_name = model_data["network_name"]
-
         # create the plot
         plot_batch_size_several_measurements(
             self.batch_sizes,
             [self.input().path],
             output.path,
-            [network_name],
+            [self.model.full_model_label],
             self.custom_plot_params,
         )
         print("plot saved")
@@ -193,6 +190,7 @@ class PlotRuntimes(
 
 class PlotRuntimesMultipleParams(
     RuntimeParameters,
+    MultiModelParameters,
     BatchSizesParameters,
     PlotTask,
     CustomPlotParameters,
@@ -205,15 +203,6 @@ class PlotRuntimesMultipleParams(
 
     sandbox = "bash::$MLP_BASE/sandboxes/plotting.sh"
 
-    model_files = law.CSVParameter(
-        description="comma-separated list of json files containing information of models to be tested",
-        brace_expand=True,
-    )
-    model_names = law.CSVParameter(
-        default=(),
-        description="comma-separated list of names of models defined in --model-files to use in output paths; "
-        "when set, the number of names must match the number of model files; default: ()",
-    )
     cmssw_versions = law.CSVParameter(
         default=(CMSSWParameters.cmssw_version._default,),
         description=f"comma-separated list of CMSSW versions; default: ({CMSSWParameters.cmssw_version._default},)",
@@ -272,6 +261,7 @@ class PlotRuntimesMultipleParams(
 
         # create the plot
         # TODO: maybe adjust labels
+        from IPython import embed; embed()
         plot_batch_size_several_measurements(
             self.batch_sizes,
             input_paths,
