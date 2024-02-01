@@ -300,7 +300,7 @@ class PlotRuntimesMultipleParams(
 
     def output(self):
         return self.local_target(
-            f"runtime_plot_{self.out_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf"
+            f"runtime_plot_{self.out_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf",
         )
 
     @view_output_plots
