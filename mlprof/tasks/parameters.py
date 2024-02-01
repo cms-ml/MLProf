@@ -4,10 +4,7 @@
 Collection of the recurrent luigi parameters for different tasks.
 """
 
-# from __future__ import annotations
-
 import os
-from dataclasses import dataclass
 
 import luigi
 import law
@@ -15,15 +12,13 @@ import law
 from mlprof.tasks.base import BaseTask
 
 
-@dataclass
-class Model:
+class Model():
 
-    model_file: str
-    name: str | None = None
-    label: str | None = None
+    def __init__(self, model_file: str, name, label, **kwargs):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        self.model_file = model_file
+        self.name = name
+        self.label = label
 
         # cached data
         self._data = None
@@ -193,7 +188,6 @@ class MultiModelParameters(BaseTask):
         super().__init__(*args, **kwargs)
 
         # check that lengths match if initialized
-        from IPython import embed; embed()
         if self.model_names[0] == law.NO_STR:
             if self.model_labels[0] != law.NO_STR:
                 if len(self.model_files) != len(self.model_labels):
