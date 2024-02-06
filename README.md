@@ -41,8 +41,7 @@ flowchart TD
     A[CreateRuntimeConfig] --> B[MeasureRuntime]
     B --> |merge the results for different batch sizes| C[MergeRuntimes]
     C --> D[PlotRuntimes]
-    C --> E[PlotRuntimesMultipleCMSSW]
-    C --> F[PlotRuntimesMultipleNetworks]
+    C --> E[PlotRuntimesMultipleParams]
 ```
 
 A task is run with the command `law run` followed by the name of the task.
@@ -85,7 +84,6 @@ law run PlotRuntimes --version test_mlprof --print-output 0
 
 This tools uses the c++ `<chrono>` library for runtime measurements and (soon) [IgProf](https://igprof.org/) for the memory profiling.
 It allows for the measurement of TensorFlow graphs with several input layers.
-The inputs can be up to 3 dimensional.
 As this tool is set to work in CMSSW, it requires a frozen graph (it is recommended to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph) function with the argument "True" for variables_to_constant).
 
 
