@@ -83,8 +83,8 @@ law run PlotRuntimes --version test_mlprof --print-output 0
 ## Profiling
 
 This tools uses the c++ `<chrono>` library for runtime measurements and (soon) [IgProf](https://igprof.org/) for the memory profiling.
-It allows for the measurement of TensorFlow graphs with several input layers.
-As this tool is set to work in CMSSW, it requires a frozen graph (it is recommended to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph) function with the argument "True" for variables_to_constant).
+It allows for the measurement of TensorFlow graphs (.pb) and ONNX models (.onnx) with several input layers.
+As this tool is set to work in CMSSW, it requires a frozen graph for TensorFlow models (it is recommended to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph) function with the argument "True" for variables_to_constant).
 
 
 ## Runtime measurement
