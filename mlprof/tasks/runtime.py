@@ -277,9 +277,8 @@ class PlotRuntimesMultipleParams(
 
         # create list of labels to plot
         self.params_product_params_to_write = [
-            combination_dict[key_to_write]
+            tuple([combination_dict[key_to_write] for key_to_write in self.params_to_write_labels])
             for combination_dict in self.labels_products_dict
-            for key_to_write in self.params_to_write_labels
         ]
 
     def flatten_tuple(self, value):
