@@ -12,9 +12,11 @@ import law
 from mlprof.tasks.base import BaseTask
 
 
-class Model():
+class Model(object):
 
     def __init__(self, model_file: str, name, label, **kwargs):
+
+        super().__init__(**kwargs)
 
         self.model_file = model_file
         self.name = name
@@ -26,7 +28,7 @@ class Model():
     @property
     def data(self):
         if self._data is None:
-            self._data = law.LocalFileTarget(self.model_file).load(formatter="json")
+            self._data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
         return self._data
 
     @property
@@ -189,15 +191,13 @@ class MultiModelParameters(BaseTask):
 
         # check that lengths match if initialized
         if self.model_names[0] == law.NO_STR:
-            if self.model_labels[0] != law.NO_STR:
-                if len(self.model_files) != len(self.model_labels):
-                    raise ValueError("the length of model_files and model_labels muss be the same")
+            if (self.model_labels[0] != law.NO_STR) and (len(self.model_files) != len(self.model_labels)):
+                raise ValueError("the lengths of model_files and model_labels must be the same")
         elif self.model_labels[0] == law.NO_STR:
             if len(self.model_files) != len(self.model_names):
-                raise ValueError("the length of model_files and model_names muss be the same")
-        else:
-            if len({len(self.model_files), len(self.model_names), len(self.model_labels)}) != 1:
-                raise ValueError("the length of model_names, model_files and model_labels muss be the same")
+                raise ValueError("the lengths of model_files and model_names must be the same")
+        elif len({len(self.model_files), len(self.model_names), len(self.model_labels)}) != 1:
+            raise ValueError("the lengths of model_names, model_files and model_labels must be the same")
 
         # if not initialized, change size objects for them to match
         if len(self.model_names) != len(self.model_files):
