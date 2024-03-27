@@ -160,9 +160,9 @@ tensorflow::Tensor TFInference::createInputTensor(int rank, std::vector<int> sha
   // fill it
   float* data = tensor.flat<float>().data();
   for (int i = 0; i < tensor.NumElements(); i++, data++) {
-    *data = inputType_ == mlprof::InputType::Incremental ? float(i)
-            : inputType_ == mlprof::InputType::Zeros     ? float(0)
-                                                         : drawNormal();
+    *data = inputType_ == mlprof::InputType::Incremental
+                ? float(i)
+                : (inputType_ == mlprof::InputType::Zeros ? float(0) : drawNormal());
   }
 
   return tensor;
