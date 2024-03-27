@@ -1,6 +1,21 @@
-<use name="FWCore/Framework" />
-<use name="FWCore/PluginManager" />
-<use name="FWCore/ParameterSet" />
-<use name="PhysicsTools/TensorFlow" />
+<library name="MLProfRuntimeMeasurementTFInference" file="TFInference.cc">
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/PluginManager"/>
+  <use name="FWCore/ParameterSet"/>
 
-<flags EDM_PLUGIN="1" />
+  <use name="PhysicsTools/TensorFlow"/>
+  <use name="MLProf/Utils"/>
+
+  <flags EDM_PLUGIN="1"/>
+</library>
+
+<library name="MLProfRuntimeMeasurementONNXInference" file="ONNXInference.cc">
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/PluginManager"/>
+  <use name="FWCore/ParameterSet"/>
+
+  <use name="PhysicsTools/ONNXRuntime"/>
+  <use name="MLProf/Utils"/>
+
+  <flags EDM_PLUGIN="1"/>
+</library>

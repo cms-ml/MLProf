@@ -12,14 +12,56 @@ import law
 from mlprof.tasks.base import BaseTask
 
 
+class Model(object):
+
+    def __init__(self, model_file: str, name, label, **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.model_file = os.path.abspath(os.path.expandvars(os.path.expanduser(model_file)))
+        self.name = name
+        self.label = label
+
+        # cached data
+        self._data = None
+
+    @property
+    def data(self):
+        if self._data is None:
+            self._data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
+        return self._data
+
+    @property
+    def full_name(self):
+        if self.name:
+            return self.name
+
+        # create a hash
+        name = os.path.splitext(os.path.basename(self.model_file))[0]
+        return f"{name}{law.util.create_hash(self.model_file)}"
+
+    @property
+    def full_model_label(self):
+        if self.label:
+            return self.label
+
+        # get the network_name field in the model data
+        network_name = self.data.get("network_name")
+        if network_name:
+            return network_name
+
+        # fallback to the full model name
+        return self.full_name
+
+
 class CMSSWParameters(BaseTask):
     """
     Parameters related to the CMSSW environment
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_13_3_1",
-        description="CMSSW version; default: CMSSW_13_3_1",
+        default="CMSSW_13_3_3",
+        description="CMSSW version; default: CMSSW_13_3_3",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
@@ -40,16 +82,6 @@ class RuntimeParameters(BaseTask):
     General parameters for the model definition and the runtime measurement.
     """
 
-    model_file = luigi.Parameter(
-        default="$MLP_BASE/examples/simple_dnn/model.json",
-        description="json file containing information of model to be tested; "
-        "default: $MLP_BASE/examples/simple_dnn/model.json",
-    )
-    model_name = luigi.Parameter(
-        default=law.NO_STR,
-        description="when set, use this name for storing outputs instead of a hashed version of "
-        "--model-file; default: empty",
-    )
     input_type = luigi.Parameter(
         default="random",
         description="either 'random', 'incremental', 'zeros', or a path to a root file; default: random",
@@ -72,38 +104,131 @@ class RuntimeParameters(BaseTask):
             self.input_file = os.path.abspath(os.path.expandvars(os.path.expanduser(self.input_type)))
             if not os.path.exists(self.input_file):
                 raise ValueError(
-                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor a path to an existing "
-                    f"root file",
+                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor "
+                    f"a path to an existing root file",
                 )
-
-        # cached model content
-        self._model_data = None
-
-    @property
-    def model_data(self):
-        if self._model_data is None:
-            self._model_data = law.LocalFileTarget(self.model_file).load(formatter="json")
-        return self._model_data
-
-    @property
-    def full_model_name(self):
-        if self.model_name not in (None, law.NO_STR):
-            return self.model_name
-
-        # create a hash
-        model_file = os.path.expandvars(os.path.expanduser(self.model_file))
-        model_name = os.path.splitext(os.path.basename(model_file))[0]
-        return f"{model_name}{law.util.create_hash(model_file)}"
 
     def store_parts(self):
         parts = super().store_parts()
 
         # build a combined string that represents the significant parameters
         params = [
-            f"model_{self.full_model_name}",
             f"input_{law.util.create_hash(self.input_file) if self.input_file else self.input_type}",
             f"nevents_{self.n_events}",
             f"ncalls_{self.n_calls}",
+        ]
+        parts.insert_before("version", "runtime_params", "__".join(params))
+
+        return parts
+
+
+class ModelParameters(BaseTask):
+    """
+    General parameters for the model definition and the runtime measurement.
+    """
+
+    model_file = luigi.Parameter(
+        default="$MLP_BASE/examples/simple_dnn/model_tf.json",
+        description="json file containing information of model to be tested; "
+        "default: $MLP_BASE/examples/simple_dnn/model_tf.json",
+    )
+    model_name = luigi.Parameter(
+        default=law.NO_STR,
+        description="when set, use this name for storing outputs instead of a hashed version of "
+        "--model-file; default: empty",
+    )
+    model_label = luigi.Parameter(
+        default=law.NO_STR,
+        description="when set, use this label in plots; when empty, the 'network_name' field in the model json data is "
+        "used when existing, and full_name otherwise; default: empty",
+    )
+
+    @classmethod
+    def modify_param_values(cls, params) -> dict:
+        params = super().modify_param_values(params)
+
+        if params.get("model_file"):
+            params["model_file"] = os.path.abspath(os.path.expandvars(os.path.expanduser(params["model_file"])))
+
+        return params
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.model = Model(
+            model_file=self.model_file,
+            name=self.model_name if self.model_name != law.NO_STR else None,
+            label=self.model_label if self.model_label != law.NO_STR else None,
+        )
+
+    def store_parts(self):
+        parts = super().store_parts()
+
+        # build a combined string that represents the significant parameters
+        params = [
+            f"model_{self.model.full_name}",
+        ]
+        parts.insert_before("version", "model_params", "__".join(params))
+
+        return parts
+
+
+class MultiModelParameters(BaseTask):
+    """
+    General parameters for the model definition and the runtime measurement.
+    """
+
+    model_files = law.CSVParameter(
+        description="comma-separated list of json files containing information of models to be tested",
+        brace_expand=True,
+    )
+    model_names = law.CSVParameter(
+        default=law.NO_STR,
+        description="comma-separated list of names of models defined in --model-files to use in output paths "
+        "instead of a hashed version of model_files; when set, the number of names must match the number of "
+        "model files; default: ()",
+    )
+    model_labels = law.CSVParameter(
+        default=law.NO_STR,
+        description="when set, use this label in plots; when empty, the 'network_name' field in the "
+        "model json data is used when existing, and full_model_name otherwise; default: empty",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # check that lengths match if initialized
+        if self.model_names[0] == law.NO_STR:
+            if (self.model_labels[0] != law.NO_STR) and (len(self.model_files) != len(self.model_labels)):
+                raise ValueError("the lengths of model_files and model_labels must be the same")
+        elif self.model_labels[0] == law.NO_STR:
+            if len(self.model_files) != len(self.model_names):
+                raise ValueError("the lengths of model_files and model_names must be the same")
+        elif len({len(self.model_files), len(self.model_names), len(self.model_labels)}) != 1:
+            raise ValueError("the lengths of model_names, model_files and model_labels must be the same")
+
+        # if not initialized, change size objects for them to match
+        if len(self.model_names) != len(self.model_files):
+            self.model_names = (law.NO_STR,) * len(self.model_files)
+        if len(self.model_labels) != len(self.model_files):
+            self.model_labels = (law.NO_STR,) * len(self.model_files)
+
+        # define Model objects
+        self.models = [
+            Model(
+                model_file=x,
+                name=y if y != law.NO_STR else None,
+                label=z if z != law.NO_STR else None,
+            )
+            for x, y, z in zip(self.model_files, self.model_names, self.model_labels)
+        ]
+
+    def store_parts(self):
+        parts = super().store_parts()
+
+        # build a combined string that represents the significant parameters
+        params = [
+            f"model_{model.full_name}" for model in self.models
         ]
         parts.insert_before("version", "model_params", "__".join(params))
 
