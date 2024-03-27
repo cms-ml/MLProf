@@ -1,5 +1,5 @@
 /*
- * Plugin to measure the runtime of a tensorflow graph.
+ * Plugin to measure the inference runtime of a tensorflow model.
  */
 
 #include <chrono>
@@ -19,13 +19,12 @@
 
 #include "MLProf/Utils/interface/utils.h"
 
-class TFRuntime : public edm::stream::EDAnalyzer<edm::GlobalCache<tensorflow::SessionCache>> {
+class TFInference : public edm::stream::EDAnalyzer<edm::GlobalCache<tensorflow::SessionCache>> {
 public:
-  explicit TFRuntime(const edm::ParameterSet&, const tensorflow::SessionCache*);
-  ~TFRuntime(){};
+  explicit TFInference(const edm::ParameterSet&, const tensorflow::SessionCache*);
+  ~TFInference(){};
 
   static void fillDescriptions(edm::ConfigurationDescriptions&);
-
   static std::unique_ptr<tensorflow::SessionCache> initializeGlobalCache(const edm::ParameterSet&);
   static void globalEndJob(const tensorflow::SessionCache*);
 
@@ -44,7 +43,7 @@ private:
   std::string inputTypeStr_;
   std::vector<int> inputRanks_;
   std::vector<int> flatInputSizes_;
-  std::vector<int> batchSizes_;
+  int batchSize_;
   int nCalls_;
 
   // other members
@@ -57,16 +56,16 @@ private:
   const tensorflow::Session* session_;
 };
 
-std::unique_ptr<tensorflow::SessionCache> TFRuntime::initializeGlobalCache(const edm::ParameterSet& params) {
+std::unique_ptr<tensorflow::SessionCache> TFInference::initializeGlobalCache(const edm::ParameterSet& params) {
   std::string graphPath = edm::FileInPath(params.getParameter<std::string>("graphPath")).fullPath();
   // cpu-only for now
   tensorflow::Options options{tensorflow::Backend::cpu};
   return std::make_unique<tensorflow::SessionCache>(graphPath, options);
 }
 
-void TFRuntime::globalEndJob(const tensorflow::SessionCache* cache) {}
+void TFInference::globalEndJob(const tensorflow::SessionCache* cache) {}
 
-void TFRuntime::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void TFInference::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
 
   // the path to the file containing the graph
@@ -85,21 +84,21 @@ void TFRuntime::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   // (for a graph with a 1D and a 2D input tensor, this would be a vector of three values)
   desc.add<std::vector<int>>("flatInputSizes");
   // batch sizes to test
-  desc.add<std::vector<int>>("batchSizes");
+  desc.add<int>("batchSize");
   // the number of calls to the graph to measure the runtime
   desc.add<int>("nCalls");
 
   descriptions.addWithDefaultLabel(desc);
 }
 
-TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionCache* cache)
+TFInference::TFInference(const edm::ParameterSet& config, const tensorflow::SessionCache* cache)
     : inputTensorNames_(config.getParameter<std::vector<std::string>>("inputTensorNames")),
       outputTensorNames_(config.getParameter<std::vector<std::string>>("outputTensorNames")),
       outputFile_(config.getParameter<std::string>("outputFile")),
       inputTypeStr_(config.getParameter<std::string>("inputType")),
       inputRanks_(config.getParameter<std::vector<int>>("inputRanks")),
       flatInputSizes_(config.getParameter<std::vector<int>>("flatInputSizes")),
-      batchSizes_(config.getParameter<std::vector<int>>("batchSizes")),
+      batchSize_(config.getParameter<int>("batchSize")),
       nCalls_(config.getParameter<int>("nCalls")),
       nInputs_(inputTensorNames_.size()),
       nPreCalls_(10),
@@ -122,10 +121,8 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
         << "sum of input ranks must match number of flat input sizes, got " << flatInputSizes_.size();
   }
   // batch size must be positive
-  for (auto batchSize : batchSizes_) {
-    if (batchSize < 1) {
-      throw cms::Exception("InvalidBatchSize") << "batch sizes must be positive, got " << batchSize;
-    }
+  if (batchSize_ < 1) {
+    throw cms::Exception("InvalidBatchSize") << "batch size must be positive, got " << batchSize_;
   }
   // input sizes must be positive
   for (auto size : flatInputSizes_) {
@@ -146,11 +143,11 @@ TFRuntime::TFRuntime(const edm::ParameterSet& config, const tensorflow::SessionC
   }
 }
 
-void TFRuntime::beginJob() {}
+void TFInference::beginJob() {}
 
-void TFRuntime::endJob() {}
+void TFInference::endJob() {}
 
-tensorflow::Tensor TFRuntime::createInputTensor(int rank, std::vector<int> shape) {
+tensorflow::Tensor TFInference::createInputTensor(int rank, std::vector<int> shape) {
   // convert the shape to a tf shape
   tensorflow::TensorShape tShape;
   for (auto dim : shape) {
@@ -163,50 +160,48 @@ tensorflow::Tensor TFRuntime::createInputTensor(int rank, std::vector<int> shape
   // fill it
   float* data = tensor.flat<float>().data();
   for (int i = 0; i < tensor.NumElements(); i++, data++) {
-    *data = inputType_ == mlprof::InputType::Incremental ? float(i) :
-    inputType_ == mlprof::InputType::Zeros ? float(0) :
-    drawNormal();
+    *data = inputType_ == mlprof::InputType::Incremental ? float(i)
+            : inputType_ == mlprof::InputType::Zeros     ? float(0)
+                                                         : drawNormal();
   }
 
   return tensor;
 }
 
-void TFRuntime::analyze(const edm::Event& event, const edm::EventSetup& setup) {
-  for (int batchSize : batchSizes_) {
-    // prepare inputs
-    std::vector<std::pair<std::string, tensorflow::Tensor>> inputs;
-    int sizeOffset = 0;
-    for (int i = 0; i < nInputs_; i++) {
-      // build the shape
-      std::vector<int> shape = {batchSize};
-      for (int j = 0; j < inputRanks_[i]; j++, sizeOffset++) {
-        shape.push_back(flatInputSizes_[sizeOffset]);
-      }
-      // create and save it
-      inputs.push_back({inputTensorNames_[i], createInputTensor(inputRanks_[i], shape)});
+void TFInference::analyze(const edm::Event& event, const edm::EventSetup& setup) {
+  // prepare inputs
+  std::vector<std::pair<std::string, tensorflow::Tensor>> inputs;
+  int sizeOffset = 0;
+  for (int i = 0; i < nInputs_; i++) {
+    // build the shape
+    std::vector<int> shape = {batchSize_};
+    for (int j = 0; j < inputRanks_[i]; j++, sizeOffset++) {
+      shape.push_back(flatInputSizes_[sizeOffset]);
     }
-
-    // prepare output vectors
-    std::vector<tensorflow::Tensor> outputs;
-
-    // pre calls to "warm up"
-    for (int r = 0; r < nPreCalls_; r++) {
-      tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
-    }
-
-    // actual calls to measure runtimes
-    std::vector<float> runtimes;
-    for (int r = 0; r < nCalls_; r++) {
-      auto start = std::chrono::high_resolution_clock::now();
-      tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
-      auto end = std::chrono::high_resolution_clock::now();
-      std::chrono::duration<float> runtime_in_seconds = (end - start);
-      runtimes.push_back(runtime_in_seconds.count() * 1000);
-    }
-
-    // save them
-    mlprof::writeRuntimes(outputFile_, batchSize, runtimes);
+    // create and save it
+    inputs.push_back({inputTensorNames_[i], createInputTensor(inputRanks_[i], shape)});
   }
+
+  // prepare output vectors
+  std::vector<tensorflow::Tensor> outputs;
+
+  // pre calls to "warm up"
+  for (int r = 0; r < nPreCalls_; r++) {
+    tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
+  }
+
+  // actual calls to measure runtimes
+  std::vector<float> runtimes;
+  for (int r = 0; r < nCalls_; r++) {
+    auto start = std::chrono::high_resolution_clock::now();
+    tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> runtime_in_seconds = (end - start);
+    runtimes.push_back(runtime_in_seconds.count() * 1000);
+  }
+
+  // save them
+  mlprof::writeRuntimes(outputFile_, batchSize_, runtimes);
 }
 
-DEFINE_FWK_MODULE(TFRuntime);
+DEFINE_FWK_MODULE(TFInference);

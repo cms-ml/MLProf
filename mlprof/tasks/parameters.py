@@ -18,7 +18,7 @@ class Model(object):
 
         super().__init__(**kwargs)
 
-        self.model_file = model_file
+        self.model_file = os.path.abspath(os.path.expandvars(os.path.expanduser(model_file)))
         self.name = name
         self.label = label
 
@@ -37,9 +37,8 @@ class Model(object):
             return self.name
 
         # create a hash
-        model_file = os.path.expandvars(os.path.expanduser(self.model_file))
-        name = os.path.splitext(os.path.basename(model_file))[0]
-        return f"{name}{law.util.create_hash(model_file)}"
+        name = os.path.splitext(os.path.basename(self.model_file))[0]
+        return f"{name}{law.util.create_hash(self.model_file)}"
 
     @property
     def full_model_label(self):
@@ -61,8 +60,8 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_13_3_1",
-        description="CMSSW version; default: CMSSW_13_3_1",
+        default="CMSSW_13_3_3",
+        description="CMSSW version; default: CMSSW_13_3_3",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
@@ -129,9 +128,9 @@ class ModelParameters(BaseTask):
     """
 
     model_file = luigi.Parameter(
-        default="$MLP_BASE/examples/simple_dnn/model.json",
+        default="$MLP_BASE/examples/simple_dnn/model_tf.json",
         description="json file containing information of model to be tested; "
-        "default: $MLP_BASE/examples/simple_dnn/model.json",
+        "default: $MLP_BASE/examples/simple_dnn/model_tf.json",
     )
     model_name = luigi.Parameter(
         default=law.NO_STR,
@@ -143,6 +142,15 @@ class ModelParameters(BaseTask):
         description="when set, use this label in plots; when empty, the 'network_name' field in the model json data is "
         "used when existing, and full_name otherwise; default: empty",
     )
+
+    @classmethod
+    def modify_param_values(cls, params) -> dict:
+        params = super().modify_param_values(params)
+
+        if params.get("model_file"):
+            params["model_file"] = os.path.abspath(os.path.expandvars(os.path.expanduser(params["model_file"])))
+
+        return params
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -45,7 +45,8 @@ class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
 
         # resolve the graph path relative to the model file
         graph_path = os.path.expandvars(os.path.expanduser(model_data["file"]))
-        graph_path = os.path.join(os.path.dirname(self.model_file), graph_path)
+        model_file = os.path.expandvars(os.path.expanduser(self.model_file))
+        graph_path = os.path.join(os.path.dirname(model_file), graph_path)
 
         # determine input files
         if self.input_file:
@@ -81,7 +82,7 @@ class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
         if model_data["inference_engine"] == "tf":
             template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/tf_runtime_template_cfg.py"
         elif model_data["inference_engine"] == "onnx":
-            template = "$MLP_BASE/cmssw/MLProf/ONNXRuntimeModule/test/onnx_runtime_template_cfg.py"
+            template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/onnx_runtime_template_cfg.py"
         else:
             raise Exception("The only inference_engine supported are 'tf' and 'onnx'")
 
@@ -111,13 +112,13 @@ class MeasureRuntime(CommandTask, RuntimeParameters, ModelParameters, CMSSWSandb
         return CreateRuntimeConfig.req(self)
 
     def output(self):
-        return self.local_target(f"runtime_bs_{self.batch_size}.csv")
+        return self.local_target(f"runtime_bs{self.batch_size}.csv")
 
     def build_command(self):
         return [
             "cmsRun",
             self.input().path,
-            f"batchSizes={self.batch_size}",
+            f"batchSize={self.batch_size}",
             f"csvFile={self.output().path}",
         ]
 
@@ -131,7 +132,7 @@ class MergeRuntimes(RuntimeParameters, ModelParameters, CMSSWParameters, BatchSi
         ]
 
     def output(self):
-        return self.local_target(f"runtimes_bs_{self.batch_sizes_repr}.csv")
+        return self.local_target(f"runtimes_bs{self.batch_sizes_repr}.csv")
 
     def run(self):
         # merge files
