@@ -10,7 +10,14 @@ options.register(
     1,
     VarParsing.multiplicity.singleton,
     VarParsing.varType.int,
-    "Batch sizes to be tested",
+    "Batch size to be tested",
+)
+options.register(
+    "batchRules",
+    [],
+    VarParsing.multiplicity.list,
+    VarParsing.varType.string,
+    "Batch rules (format 'target_size:size_1,size_2,...') to be configured",
 )
 options.register(
     "csvFile",
@@ -48,16 +55,12 @@ process.options.numberOfStreams = cms.untracked.uint32(0)
 process.options.numberOfConcurrentLuminosityBlocks = cms.untracked.uint32(1)
 
 # setup the plugin
-process.load("MLProf.RuntimeMeasurement.onnxInference_cfi")
-process.onnxInference.graphPath = cms.string("__GRAPH_PATH__")
-process.onnxInference.inputTensorNames = cms.vstring(__INPUT_TENSOR_NAMES__)  # noqa
-process.onnxInference.outputTensorNames = cms.vstring(__OUTPUT_TENSOR_NAMES__)  # noqa
-process.onnxInference.outputFile = cms.string(options.csvFile)
-process.onnxInference.inputType = cms.string("__INPUT_TYPE__")
-process.onnxInference.inputRanks = cms.vint32(__INPUT_RANKS__)  # noqa
-process.onnxInference.flatInputSizes = cms.vint32(__FLAT_INPUT_SIZES__)  # noqa
-process.onnxInference.batchSize = cms.int32(options.batchSize)
-process.onnxInference.nCalls = cms.int32(__N_CALLS__)  # noqa
+process.load("MLProf.RuntimeMeasurement.tfaotInference_cfi")
+process.tfaotInference.outputFile = cms.string(options.csvFile)
+process.tfaotInference.inputType = cms.string("__INPUT_TYPE__")
+process.tfaotInference.batchRules = cms.vstring(options.batchRules)
+process.tfaotInference.batchSize = cms.int32(options.batchSize)
+process.tfaotInference.nCalls = cms.int32(__N_CALLS__)  # noqa
 
 # define what to run in the path
-process.p = cms.Path(process.onnxInference)
+process.p = cms.Path(process.tfaotInference)

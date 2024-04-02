@@ -23,12 +23,17 @@ class Model(object):
         self.label = label
 
         # cached data
+        self._all_data = None
         self._data = None
 
     @property
     def data(self):
         if self._data is None:
-            self._data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
+            all_data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
+            if "model" not in all_data:
+                raise Exception(f"model file '{self.model_file}' is missing 'model' field")
+            self._data = all_data["model"]
+            self._all_data = all_data
         return self._data
 
     @property
@@ -45,10 +50,10 @@ class Model(object):
         if self.label:
             return self.label
 
-        # get the network_name field in the model data
-        network_name = self.data.get("network_name")
-        if network_name:
-            return network_name
+        # get the model.name field in the model data
+        model_name = self.data.get("name")
+        if model_name:
+            return model_name
 
         # fallback to the full model name
         return self.full_name
@@ -60,8 +65,8 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_13_3_3",
-        description="CMSSW version; default: CMSSW_13_3_3",
+        default="CMSSW_14_1_X_2024-04-01-1100",
+        description="CMSSW version; default: CMSSW_14_1_X_2024-04-01-1100",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
@@ -84,7 +89,8 @@ class RuntimeParameters(BaseTask):
 
     input_type = luigi.Parameter(
         default="random",
-        description="either 'random', 'incremental', 'zeros', or a path to a root file; default: random",
+        description="either 'random', 'incremental', 'zeros', 'ones', or a path to a root file; "
+        "default: random",
     )
     n_events = luigi.IntParameter(
         default=1,
@@ -276,6 +282,9 @@ class CustomPlotParameters(BaseTask):
 
     @property
     def custom_plot_params(self):
-        return {"log_y": self.log_y, "bs_normalized": self.bs_normalized, "filling": self.filling,
-                "top_right_label": self.top_right_label,
-                }
+        return {
+            "log_y": self.log_y,
+            "bs_normalized": self.bs_normalized,
+            "filling": self.filling,
+            "top_right_label": self.top_right_label,
+        }

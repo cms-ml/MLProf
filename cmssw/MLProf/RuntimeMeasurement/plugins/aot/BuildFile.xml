@@ -1,0 +1,12 @@
+<library name="MLProfRuntimeMeasurementTFAOTInference" file="TFAOTInference.cc">
+  <use name="FWCore/Framework"/>
+  <use name="FWCore/PluginManager"/>
+  <use name="FWCore/ParameterSet"/>
+
+  <use name="PhysicsTools/TensorFlowAOT"/>
+  <use name="MLProf/Utils"/>
+
+  <use name="tfaot-model-mlprof-test"/>
+
+  <flags EDM_PLUGIN="1"/>
+</library>

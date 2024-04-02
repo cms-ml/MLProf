@@ -17,6 +17,7 @@ namespace mlprof {
     Incremental,
     Random,
     Zeros,
+    Ones,
   };
 
   void writeRuntimes(const std::string& path, float batchSize, std::vector<float> runtimes) {

@@ -22,7 +22,7 @@ from mlprof.plotting.plotter import plot_batch_size_several_measurements
 class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
 
     default_input_files = {
-        "CMSSW_*": ["/afs/cern.ch/user/n/nprouvos/public/testfile.root"],
+        "CMSSW_*": ["/afs/desy.de/user/r/riegerma/public/testfile.root"],
     }
 
     def find_default_input_files(self):
@@ -43,11 +43,6 @@ class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
         # get model data
         model_data = self.model.data
 
-        # resolve the graph path relative to the model file
-        graph_path = os.path.expandvars(os.path.expanduser(model_data["file"]))
-        model_file = os.path.expandvars(os.path.expanduser(self.model_file))
-        graph_path = os.path.join(os.path.dirname(model_file), graph_path)
-
         # determine input files
         if self.input_file:
             input_files = [self.input_file]
@@ -56,37 +51,52 @@ class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
             input_files = self.find_default_input_files()
             input_type = self.input_type
 
-        # prepare template variables
-        template_vars = {
-            "GRAPH_PATH": graph_path,
+        # prepare template variables, depending on the inference engine
+        template_vars = {}
+        engine = model_data["inference_engine"]
+        is_tf_or_onnx = engine in {"tf", "onnx"}
+        is_tfaot = engine == "tfaot"
+        if not is_tf_or_onnx and not is_tfaot:
+            raise Exception(f"unknown inference engine '{engine}'")
+
+        # common variables
+        template_vars.update({
             "INPUT_FILES": [
                 law.target.file.add_scheme(path, "file://")
                 for path in input_files
             ],
             "N_EVENTS": self.n_events,
             "INPUT_TYPE": input_type,
-            "INPUT_RANKS": [
-                len(inp["shape"])
-                for inp in model_data["inputs"]
-            ],
-            "FLAT_INPUT_SIZES": sum(
-                (inp["shape"] for inp in model_data["inputs"]),
-                [],
-            ),
-            "INPUT_TENSOR_NAMES": [inp["name"] for inp in model_data["inputs"]],
-            "OUTPUT_TENSOR_NAMES": [outp["name"] for outp in model_data["outputs"]],
             "N_CALLS": self.n_calls,
-        }
+        })
+
+        # tf / onnx specific
+        if is_tf_or_onnx:
+            # graph path
+            model_file = os.path.expandvars(os.path.expanduser(self.model_file))
+            graph_path = os.path.expandvars(os.path.expanduser(model_data["file"]))
+            template_vars["GRAPH_PATH"] = os.path.join(os.path.dirname(model_file), graph_path)
+
+            # input tensors
+            template_vars.update({
+                "INPUT_RANKS": [
+                    len(inp["shape"])
+                    for inp in model_data["inputs"]
+                ],
+                "FLAT_INPUT_SIZES": sum(
+                    (inp["shape"] for inp in model_data["inputs"]),
+                    [],
+                ),
+                "INPUT_TENSOR_NAMES": [inp["name"] for inp in model_data["inputs"]],
+            })
+
+            # output tensors
+            template_vars["OUTPUT_TENSOR_NAMES"] = [outp["name"] for outp in model_data["outputs"]]
 
         # load the template content
-        if model_data["inference_engine"] == "tf":
-            template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/tf_runtime_template_cfg.py"
-        elif model_data["inference_engine"] == "onnx":
-            template = "$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/onnx_runtime_template_cfg.py"
-        else:
-            raise Exception("The only inference_engine supported are 'tf' and 'onnx'")
-
+        template = f"$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/{engine}_runtime_cfg.py"
         content = law.LocalFileTarget(template).load(formatter="text")
+
         # replace variables
         for key, value in template_vars.items():
             content = content.replace(f"__{key}__", str(value))
@@ -107,6 +117,7 @@ class MeasureRuntime(CommandTask, RuntimeParameters, ModelParameters, CMSSWSandb
         default=1,
         description="the batch size to measure the runtime for; default: 1",
     )
+    # TODO: add tfaot batch rules
 
     def requires(self):
         return CreateRuntimeConfig.req(self)

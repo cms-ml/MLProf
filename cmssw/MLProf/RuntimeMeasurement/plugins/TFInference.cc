@@ -29,9 +29,9 @@ public:
   static void globalEndJob(const tensorflow::SessionCache*);
 
 private:
-  void beginJob();
+  void beginJob(){};
   void analyze(const edm::Event&, const edm::EventSetup&);
-  void endJob();
+  void endJob(){};
 
   inline float drawNormal() { return normalPdf_(rndGen_); }
   tensorflow::Tensor createInputTensor(int rank, std::vector<int> shape);
@@ -83,7 +83,7 @@ void TFInference::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
   // flat list of sizes of each dimension of each input tensor
   // (for a graph with a 1D and a 2D input tensor, this would be a vector of three values)
   desc.add<std::vector<int>>("flatInputSizes");
-  // batch sizes to test
+  // batch size to test
   desc.add<int>("batchSize");
   // the number of calls to the graph to measure the runtime
   desc.add<int>("nCalls");
@@ -137,15 +137,12 @@ TFInference::TFInference(const edm::ParameterSet& config, const tensorflow::Sess
     inputType_ = mlprof::InputType::Random;
   } else if (inputTypeStr_ == "zeros") {
     inputType_ = mlprof::InputType::Zeros;
+  } else if (inputTypeStr_ == "ones") {
+    inputType_ = mlprof::InputType::Ones;
   } else {
-    throw cms::Exception("InvalidInputType")
-        << "input type must be either 'incremental', 'zeros' or 'random', got " << inputTypeStr_;
+    throw cms::Exception("InvalidInputType") << "input type unknown: " << inputTypeStr_;
   }
 }
-
-void TFInference::beginJob() {}
-
-void TFInference::endJob() {}
 
 tensorflow::Tensor TFInference::createInputTensor(int rank, std::vector<int> shape) {
   // convert the shape to a tf shape
@@ -162,7 +159,7 @@ tensorflow::Tensor TFInference::createInputTensor(int rank, std::vector<int> sha
   for (int i = 0; i < tensor.NumElements(); i++, data++) {
     *data = inputType_ == mlprof::InputType::Incremental
                 ? float(i)
-                : (inputType_ == mlprof::InputType::Zeros ? float(0) : drawNormal());
+                : float(inputType_ == mlprof::InputType::Zeros ? 0 : drawNormal());
   }
 
   return tensor;
@@ -194,7 +191,10 @@ void TFInference::analyze(const edm::Event& event, const edm::EventSetup& setup)
   std::vector<float> runtimes;
   for (int r = 0; r < nCalls_; r++) {
     auto start = std::chrono::high_resolution_clock::now();
+
+    // inference
     tensorflow::run(session_, inputs, outputTensorNames_, &outputs);
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> runtime_in_seconds = (end - start);
     runtimes.push_back(runtime_in_seconds.count() * 1000);
