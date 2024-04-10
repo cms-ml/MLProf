@@ -1,30 +1,26 @@
 # coding: utf-8
 
-colors = {"mpl_standard": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
-                           "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"],
-          "custom_edgecolor": ["#CC4F1B", "#1B2ACC", "#3F7F4C"],
-          "custom_facecolor": ["#FF9848", "#089FFF", "#7EFF99"],
-          }
+colors = {
+    "mpl_standard": [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+    ],
+    "custom_edgecolor": ["#CC4F1B", "#1B2ACC", "#3F7F4C"],
+    "custom_facecolor": ["#FF9848", "#089FFF", "#7EFF99"],
+}
 
 
 def open_csv_file(path, columns):
     import pandas as pd
-    pd_dataset = pd.read_csv(path, delimiter=",", names=columns)
 
-    # or with chunking?
-    """
-    tp = pd.read_csv(path, delimiter=",", names=columns, iterator=True, chunksize=2000)
-    df = pd.concat(tp, ignore_index=True)
-    """
-    return pd_dataset
+    return pd.read_csv(path, delimiter=",", names=columns)
 
 
-def calculate_medians_and_errors_per_batch_size(different_batch_sizes, path):
+def calculate_medians_and_errors(batch_sizes, path):
     """
     Calculate and plot the medians and errors of the runtime per batch size
 
     Args:
-    different_batch_sizes: list(int). The list of different batch sizes to be plotted
+    batch_sizes: list(int). The list of different batch sizes to be plotted
     path: str. The path to the csv file containing the results of the measurement.
     """
     import numpy as np
@@ -33,124 +29,144 @@ def calculate_medians_and_errors_per_batch_size(different_batch_sizes, path):
     pd_dataset = open_csv_file(path, ["batch_size", "runtimes"])
 
     # create the arrays to be plotted with median values and up and down errors
-    medians = np.empty(len(different_batch_sizes))
-    err_down = np.empty(len(different_batch_sizes))
-    err_up = np.empty(len(different_batch_sizes))
+    medians = np.empty(len(batch_sizes))
+    err_down = np.empty(len(batch_sizes))
+    err_up = np.empty(len(batch_sizes))
 
-    for i, batch_size in enumerate(different_batch_sizes):
-        runtimes_per_batch_size = pd_dataset.loc[pd_dataset["batch_size"] == batch_size, "runtimes"]
-        # mean = np.mean(runtimes_per_batch_size)
-        median = np.percentile(runtimes_per_batch_size, 50)
-        medians[i] = median
-        err_down[i] = abs(np.percentile(runtimes_per_batch_size, 16) - median)
-        err_up[i] = abs(np.percentile(runtimes_per_batch_size, 84) - median)
+    for i, batch_size in enumerate(batch_sizes):
+        runtimes = pd_dataset.loc[pd_dataset["batch_size"] == batch_size, "runtimes"].values
+        medians[i] = np.percentile(runtimes, 50)
+        err_down[i] = medians[i] - np.percentile(runtimes, 16)
+        err_up[i] = np.percentile(runtimes, 84) - medians[i]
+
     return medians, err_down, err_up
 
 
-def apply_individual_customizations(customization_dict, fig, ax):
+def apply_customizations(plot_params, fig, ax):
     """
     Apply the remaining customization parameters from the command line
 
     Args:
-    customization_dict: dict. The dictionary containing the customization parameters
+    plot_params: dict. The dictionary containing the customization parameters
     fig, ax: the matplotlib object to handle figure and axis.
     """
-    import matplotlib.pyplot as plt
-    if customization_dict["log_y"]:
-        plt.yscale("log")
+    # x axis
+    if plot_params.get("x_log"):
+        ax.set_xscale("log")
+
+    # y axis
+    if plot_params.get("y_log"):
+        ax.set_yscale("log")
+    if plot_params.get("y_min") is not None:
+        y_min = plot_params["y_min"]
+        if y_min <= 0 and plot_params.get("y_log"):
+            y_min = 1e-3
+            print(f"when y_log is set, y_min must be strictly positive, setting to {y_min}")
+        ax.set_ylim(bottom=y_min)
+    if plot_params.get("y_max") is not None:
+        ax.set_ylim(top=plot_params["y_max"])
 
 
-def fill_plot(x, y, yerr_d, yerr_u, filling, color):
+def fill_plot(x, y, y_down, y_up, error_style, color):
     """
     Fill the plots with the measured values and their errors
 
     Args:
     x: array(float). x-axis values
     y: array(float). y-axis values
-    yerr_d: array(float). error down on the y-axis
-    yerr_u: array(float). error up on the y-axis
-    filling: bool. customizatioon parameter to decide if the errors will be represented as error bars or bands
+    y_down: array(float). error down on the y-axis
+    y_up: array(float). error up on the y-axis
+    error_style: str. either bars and band
     color: the colors to use for the plotted values
     """
-    import matplotlib.pyplot as plt
     import numpy as np
-    if filling:
+    import matplotlib.pyplot as plt
+
+    # TODO: use fig and ax instead
+    if error_style == "band":
         p1 = plt.plot(x, y, "-", color=color)
-        plt.fill_between(x, y - yerr_d, y + yerr_u, alpha=0.5, facecolor=color)
+        plt.fill_between(x, y - y_down, y + y_up, alpha=0.5, facecolor=color)
         p2 = plt.fill(np.NaN, np.NaN, alpha=0.5, color=color)
         legend = (p1[0], p2[0])
-    else:
-        p = plt.errorbar(x, y,
-                        yerr=(yerr_d, yerr_u),
-                        capsize=12,
-                        marker=".", linestyle="")
+    else:  # bars
+        p = plt.errorbar(x, y, yerr=(y_down, y_up), capsize=12, marker=".", linestyle="")
         legend = p[0]
+
     return legend
 
 
-def plot_batch_size_several_measurements(different_batch_sizes, input_paths, output_path, measurements,
-                                        customization_dict):
+def plot_batch_size_several_measurements(
+    batch_sizes,
+    input_paths,
+    output_path,
+    measurements,
+    plot_params,
+):
     """
     General plotting function for runtime plots
 
     Args:
-    different_batch_sizes: list(int). The batch sizes to be used for the x-axis of the plot.
+    batch_sizes: list(int). The batch sizes to be used for the x-axis of the plot.
     input_paths: list(str). The paths of the csv files containing the measurement results.
     output_path: str. The path to be used for saving the plot.
     measurements: list(str). The labels of the plot.
-    customization_dict: dict. The dictionary containing the customization parameters.
+    plot_params: dict. The dictionary containing the customization parameters.
     """
     import matplotlib.pyplot as plt
-    import mplhep as hep
+    import mplhep
 
-    if type(measurements[0]) == str:
-        measurements_paths_strs = measurements
-        measurements_labels_strs = measurements
+    if isinstance(measurements[0], str):
+        measurements_labels_strs = list(measurements)
     else:
-        measurements_paths_strs = ["_".join(measurement) for measurement in measurements]
         measurements_labels_strs = [", ".join(measurement) for measurement in measurements]
-    # get the values to be plotted
-    plotting_values = {}
-    for i, input_path in enumerate(input_paths):
-        medians, err_down, err_up = calculate_medians_and_errors_per_batch_size(different_batch_sizes, input_path)
-        if customization_dict["bs_normalized"]:
-            medians = medians / different_batch_sizes
-            err_down = err_down / different_batch_sizes
-            err_up = err_up / different_batch_sizes
-        plotting_values[measurements_paths_strs[i]] = {"medians": medians, "err_down": err_down, "err_up": err_up}
+
+    # get the values to be plotted, in the same order as the measurements
+    plot_data = []
+    for input_path in input_paths:
+        medians, err_down, err_up = calculate_medians_and_errors(batch_sizes, input_path)
+        if plot_params["bs_normalized"]:
+            medians = medians / batch_sizes
+            err_down = err_down / batch_sizes
+            err_up = err_up / batch_sizes
+        plot_data.append({"y": medians, "y_down": err_down, "y_up": err_up})
 
     # set style and add CMS logo
-    hep.set_style(hep.style.CMS)
+    with plt.style.context(mplhep.style.CMS):
+        fig, ax = plt.subplots(1, 1, figsize=(12, 9))
 
-    # create plot with curves using a single color for each value-error pair
-    fig, ax = plt.subplots(1, 1)
-    to_legend = []
-    for i in range(0, len(measurements_paths_strs)):
-        color = next(ax._get_lines.prop_cycler)["color"]
-        legend = fill_plot(different_batch_sizes, plotting_values[measurements_paths_strs[i]]["medians"],
-                  plotting_values[measurements_paths_strs[i]]["err_down"],
-                  plotting_values[measurements_paths_strs[i]]["err_up"], customization_dict["filling"],
-                  color)  # colors["mpl_standard"][i])
-        to_legend += [legend]
-    # create legend
-    plt.legend(to_legend, measurements_labels_strs)
+        # create plot with curves using a single color for each value-error pair
+        legend_entries = []
+        for data in plot_data:
+            entry = fill_plot(
+                x=batch_sizes,
+                y=data["y"],
+                y_down=data["y_down"],
+                y_up=data["y_up"],
+                error_style=plot_params["error_style"],
+                color=next(ax._get_lines.prop_cycler)["color"],
+            )
+            legend_entries.append(entry)
 
-    # apply additional parameters and improve plot style
-    plt.xscale("log")
-    apply_individual_customizations(customization_dict, fig, ax)
-    plt.xlabel("Batch size")
-    if customization_dict["bs_normalized"]:
-        plt.ylabel("Runtime / batch size [ms]")
-    else:
-        plt.ylabel("runtime [ms]")
-    plt.ylim(bottom=0)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(len(different_batch_sizes)))
-    ax.xaxis.set_minor_locator(plt.NullLocator())
-    plt.xticks(different_batch_sizes, different_batch_sizes)
+        # create legend
+        ax.legend(legend_entries, measurements_labels_strs)
 
-    # choose text to add on the top left of the figure
-    hep.cms.text(text="MLProf", loc=0)  # hep.cms.text(text="Simulation, Network test", loc=0)
-    hep.cms.lumitext(text=customization_dict["top_right_label"])
-    # save plot
-    fig.savefig(output_path, bbox_inches="tight")
-    plt.close()
+        # x axis
+        ax.set_xlabel("Batch size")
+        ax.xaxis.set_major_locator(plt.MaxNLocator(len(batch_sizes)))
+        ax.xaxis.set_minor_locator(plt.NullLocator())
+        plt.xticks(batch_sizes, batch_sizes)  # TODO: find corresponding ax call
+
+        # y axis
+        ax.set_ylabel("Runtime / batch size [ms]" if plot_params["bs_normalized"] else "Runtime [ms]")
+        if not plot_params.get("y_log"):
+            ax.set_ylim(bottom=0)
+
+        # additional customizations
+        apply_customizations(plot_params, fig, ax)
+
+        # texts
+        mplhep.cms.text(text="Simulation, MLProf", loc=0)
+        mplhep.cms.lumitext(text=plot_params["top_right_label"])
+
+        # save plot
+        fig.savefig(output_path, bbox_inches="tight")

@@ -1,0 +1,15 @@
+model:
+  name: dnn_2_inputs
+
+  inference_engine: tf
+
+  file: dnn_2_inputs.pb
+
+  inputs:
+    - name: input_0
+      shape: [392]
+    - name: input_1
+      shape: [392]
+
+  outputs:
+    - name: Identity

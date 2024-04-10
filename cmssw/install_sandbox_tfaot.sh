@@ -33,6 +33,12 @@ action() {
     # remove non-aot specific files
     rm -rf MLProf/*/plugins/*.{xml,cc}
 
+    # move aot files
+    for d in MLProf/*/plugins; do
+        [ -d "${d}/aot" ] && mv "${d}/aot"/* "${d}"
+        rm -rf "${d}/aot"
+    done
+
     # compile the model
     local aot_dir="${CMSSW_BASE}/mlprof_aot"
     rm -rf "${aot_dir}"
@@ -47,16 +53,13 @@ action() {
     # setup the tool
     scram setup "${aot_dir}/${tool_name}.xml" || return "$?"
 
-    # move aot files
-    for d in MLProf/*/plugins; do
-        [ -d "${d}/aot" ] && mv "${d}/aot"/* "${d}"
-        rm -rf "${d}/aot"
-    done
+    # extract the model name
+    local model_name="$( python3 -c "import yaml; print(yaml.safe_load(open('${aot_config}'))['model']['name'])" )"
 
     # fill template variables *.cc files
     local header_file="$( ls -1 "${aot_dir}/include/${tool_name}"/*_bs*.h | head -n 1 )"
     for f in MLProf/*/plugins/*.cc; do
-        python3 "${this_dir}/render_aot.py" "${f}" "${header_file}" || return "$?"
+        python3 "${MLP_BASE}/mlprof/scripts/render_aot.py" "${f}" "${header_file}" "${model_name}" || return "$?"
     done
 }
 action "$@"

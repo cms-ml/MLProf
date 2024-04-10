@@ -202,9 +202,13 @@ class CommandTask(BaseTask):
                 parent.touch()
                 handled_parent_uris.add(parent.uri())
 
-    def run_command(self, cmd, optional=False, **kwargs):
+    def run_command(self, cmd, cmd_repr=None, optional=False, **kwargs):
         # proper command encoding
         cmd = (law.util.quote_cmd(cmd) if isinstance(cmd, (list, tuple)) else cmd).strip()
+
+        # default command representation
+        if not cmd_repr:
+            cmd_repr = law.util.colored(cmd, "cyan")
 
         # when no cwd was set and run_command_in_tmp is True, create a tmp dir
         if "cwd" not in kwargs and self.run_command_in_tmp:
@@ -214,7 +218,7 @@ class CommandTask(BaseTask):
         self.publish_message(f"cwd: {kwargs.get('cwd', os.getcwd())}")
 
         # call it
-        with self.publish_step(f"running '{law.util.colored(cmd, 'cyan')}' ..."):
+        with self.publish_step(f"running '{cmd_repr}' ..."):
             p, lines = law.util.readable_popen(cmd, shell=True, executable="/bin/bash", **kwargs)
             for line in lines:
                 print(line)
@@ -237,9 +241,12 @@ class CommandTask(BaseTask):
 
         # build the command
         cmd = self.build_command()
+        cmd_repr = None
+        if isinstance(cmd, (list, tuple)) and len(cmd) == 2:
+            cmd, cmd_repr = cmd
 
         # run it
-        self.run_command(cmd, **kwargs)
+        self.run_command(cmd, cmd_repr=cmd_repr, **kwargs)
 
         self.post_run_command()
 
@@ -248,6 +255,24 @@ class CommandTask(BaseTask):
 
     def post_run_command(self):
         return
+
+
+class CMSRunCommandTask(CommandTask):
+
+    def build_cmsrun_command(self, cfg_file, options=None):
+        # highlighting helpers
+        hl1 = lambda s: law.util.colored(s, color="cyan", style="bright")
+        hl2 = lambda s: law.util.colored(s, color="cyan")
+
+        # build the command and its representation
+        cmd = ["cmsRun", cfg_file]
+        cmd_repr = f"{hl1('cmsRun')} {hl2(cfg_file)}"
+        for key, values in (options or {}).items():
+            value = ",".join(map(str, law.util.make_list(values)))
+            cmd.append(f"{key}={value}")
+            cmd_repr += f" {hl1(key + '=')}{hl2(value)}"
+
+        return cmd, cmd_repr
 
 
 class PlotTask(BaseTask):

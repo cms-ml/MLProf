@@ -1,6 +1,6 @@
 [flake8]
 
-# line length of 100 is recommended, but set it to a forgiving value
+# line length
 max-line-length = 120
 
 # codes of errors to ignore

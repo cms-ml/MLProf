@@ -59,7 +59,7 @@ private:
   std::normal_distribution<double> normalPDFDouble_;
 
   // aot model
-  tfaot::Model<tfaot_model::test_simple> model_;
+  // INSERT=model
 };
 
 void TFAOTInference::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
@@ -108,37 +108,10 @@ TFAOTInference::TFAOTInference(const edm::ParameterSet& config)
     throw cms::Exception("InvalidInputType") << "input type unknown: " << inputTypeStr_;
   }
 
-  // parse and register batch rules
-  for (size_t i = 0; i < batchRules_.size(); i++) {
-    std::string rule = batchRules_[i];
-
-    // extract the target batch size from the front
-    auto pos = rule.find(":");
-    if (pos == std::string::npos) {
-      throw cms::Exception("InvalidBatchRule") << "invalid batch rule format: " << batchRules_[i];
-    }
-    size_t batchSize = std::stoi(rule.substr(0, pos));
-    rule = rule.substr(pos + 1);
-
-    // loop through remaining comma-separated composite batch size
-    std::vector<size_t> sizes;
-    size_t sumSizes = 0;
-    while (!rule.empty()) {
-      pos = rule.find(",");
-      sizes.push_back(std::stoi(rule.substr(0, pos)));
-      sumSizes += sizes.back();
-      rule = rule.substr(pos + 1);
-    }
-
-    // the sum of composite batch sizes should never be smaller than the target batch size
-    if (sumSizes < batchSize) {
-      throw cms::Exception("InvalidBatchRule")
-          << "sum of composite batch sizes is smaller than target batch size: " << batchRules_[i];
-    }
-
-    // register the batch rule
-    model_.setBatchRule(batchSize, sizes, sumSizes - batchSize);
-    std::cout << "registered batch rule for batch size " << batchSize << std::endl;
+  // register batch rules
+  for (const auto& rule : batchRules_) {
+    model_.setBatchRule(rule);
+    std::cout << "registered batch rule " << rule << std::endl;
   }
 }
 

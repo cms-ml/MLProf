@@ -28,7 +28,7 @@ type_to_array = {
 }
 
 
-def render_aot(plugin_file: str, header_file: str) -> None:
+def render_aot(plugin_file: str, header_file: str, model_name: str) -> None:
     # prepare paths
     plugin_file = os.path.expandvars(os.path.expanduser(plugin_file))
     header_file = os.path.expandvars(os.path.expanduser(header_file))
@@ -47,6 +47,10 @@ def render_aot(plugin_file: str, header_file: str) -> None:
     output_arrays = [f"tfaot::{outp.array_type}Arrays" for outp in output_signatures]
     output_names = [f"output{i}" for i in range(len(input_signatures))]
 
+    # model member
+    content["model"] = [
+        f"tfaot::Model<tfaot_model::{model_name}> model_;",
+    ]
     # inputs
     content["inputs"] = [
         f"{arr} {name} = create{inp.array_type}Input({inp.shape1});"
@@ -88,11 +92,11 @@ def parse_signatures(header_file: str) -> tuple[list[Input], list[Output]]:
     # build input and output signatures
     input_signatures = [
         Input(type_to_array[t], c)
-        for t, c in zip(header_data.arg_types, header_data.arg_counts)
+        for t, c in zip(header_data.arg_types, header_data.arg_counts_no_batch)
     ]
     output_signatures = [
         Output(type_to_array[t], c)
-        for t, c in zip(header_data.res_types, header_data.res_counts)
+        for t, c in zip(header_data.res_types, header_data.res_counts_no_batch)
     ]
 
     return input_signatures, output_signatures
@@ -104,9 +108,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("plugin_file", help="path to the plugin file to render in-place")
     parser.add_argument("header_file", help="path to the header file to read variables from")
+    parser.add_argument("model_name", help="name of the model class")
     args = parser.parse_args()
 
-    render_aot(args.plugin_file, args.header_file)
+    render_aot(args.plugin_file, args.header_file, args.model_name)
 
     return 0
 

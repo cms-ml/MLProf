@@ -5,19 +5,69 @@ from FWCore.ParameterSet.VarParsing import VarParsing
 
 # setup minimal options
 options = VarParsing("python")
-options.register(
-    "batchSize",
-    1,
-    VarParsing.multiplicity.singleton,
-    VarParsing.varType.int,
-    "Batch size to be tested",
-)
+options.setDefault("maxEvents", 1)
 options.register(
     "csvFile",
     "results.csv",
     VarParsing.multiplicity.singleton,
     VarParsing.varType.string,
-    "The path of the csv file to save results",
+    "path of the csv file to save results",
+)
+options.register(
+    "batchSize",
+    1,
+    VarParsing.multiplicity.singleton,
+    VarParsing.varType.int,
+    "batch size to be tested",
+)
+options.register(
+    "inputType",
+    "",
+    VarParsing.multiplicity.singleton,
+    VarParsing.varType.string,
+    "input type; 'random', 'incremental', 'zeros', or 'ones'",
+)
+options.register(
+    "nCalls",
+    100,
+    VarParsing.multiplicity.singleton,
+    VarParsing.varType.int,
+    "number of evaluation calls for averaging",
+)
+options.register(
+    "graphPath",
+    "",
+    VarParsing.multiplicity.singleton,
+    VarParsing.varType.string,
+    "path to the graph file",
+)
+options.register(
+    "inputTensorNames",
+    [],
+    VarParsing.multiplicity.list,
+    VarParsing.varType.string,
+    "names of the input tensors",
+)
+options.register(
+    "outputTensorNames",
+    [],
+    VarParsing.multiplicity.list,
+    VarParsing.varType.string,
+    "Names of the output tensors",
+)
+options.register(
+    "inputRanks",
+    [],
+    VarParsing.multiplicity.list,
+    VarParsing.varType.int,
+    "ranks of the input tensors",
+)
+options.register(
+    "flatInputSizes",
+    [],
+    VarParsing.multiplicity.list,
+    VarParsing.varType.int,
+    "sizes of the flattened input tensors; the amount should match the sum of ranks",
 )
 options.parseArguments()
 
@@ -29,11 +79,11 @@ process = cms.Process("MLPROF")
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 process.maxEvents = cms.untracked.PSet(
-    input=cms.untracked.int32(__N_EVENTS__),  # noqa
+    input=cms.untracked.int32(options.maxEvents),
 )
 process.source = cms.Source(
     "PoolSource",
-    fileNames=cms.untracked.vstring(*__INPUT_FILES__),  # noqa
+    fileNames=cms.untracked.vstring(options.inputFiles),
 )
 
 # process options
@@ -44,20 +94,20 @@ process.options = cms.untracked.PSet(
 
 # multi-threading options
 process.options.numberOfThreads = cms.untracked.uint32(1)
-process.options.numberOfStreams = cms.untracked.uint32(0)
+process.options.numberOfStreams = cms.untracked.uint32(1)
 process.options.numberOfConcurrentLuminosityBlocks = cms.untracked.uint32(1)
 
 # setup the plugin
 process.load("MLProf.RuntimeMeasurement.onnxInference_cfi")
-process.onnxInference.graphPath = cms.string("__GRAPH_PATH__")
-process.onnxInference.inputTensorNames = cms.vstring(__INPUT_TENSOR_NAMES__)  # noqa
-process.onnxInference.outputTensorNames = cms.vstring(__OUTPUT_TENSOR_NAMES__)  # noqa
+process.onnxInference.graphPath = cms.string(options.graphPath)
+process.onnxInference.inputTensorNames = cms.vstring(options.inputTensorNames)
+process.onnxInference.outputTensorNames = cms.vstring(options.outputTensorNames)
 process.onnxInference.outputFile = cms.string(options.csvFile)
-process.onnxInference.inputType = cms.string("__INPUT_TYPE__")
-process.onnxInference.inputRanks = cms.vint32(__INPUT_RANKS__)  # noqa
-process.onnxInference.flatInputSizes = cms.vint32(__FLAT_INPUT_SIZES__)  # noqa
+process.onnxInference.inputType = cms.string(options.inputType)
+process.onnxInference.inputRanks = cms.vint32(options.inputRanks)
+process.onnxInference.flatInputSizes = cms.vint32(options.flatInputSizes)
 process.onnxInference.batchSize = cms.int32(options.batchSize)
-process.onnxInference.nCalls = cms.int32(__N_CALLS__)  # noqa
+process.onnxInference.nCalls = cms.int32(options.nCalls)
 
 # define what to run in the path
 process.p = cms.Path(process.onnxInference)

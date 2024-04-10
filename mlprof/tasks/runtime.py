@@ -7,134 +7,73 @@ Collection of test tasks.
 import os
 import itertools
 
-import luigi
 import law
 
-from mlprof.tasks.base import CommandTask, PlotTask, view_output_plots
+from mlprof.tasks.base import CMSRunCommandTask, PlotTask, view_output_plots
 from mlprof.tasks.parameters import (
-    RuntimeParameters, ModelParameters, MultiModelParameters, CMSSWParameters, BatchSizesParameters,
-    CustomPlotParameters,
+    RuntimeParameters, ModelParameters, MultiModelParameters, CMSSWParameters, MultiCMSSWParameters,
+    BatchSizesParameters, CustomPlotParameters,
 )
 from mlprof.tasks.sandboxes import CMSSWSandboxTask
 from mlprof.plotting.plotter import plot_batch_size_several_measurements
+from mlprof.util import expand_path
 
 
-class CreateRuntimeConfig(RuntimeParameters, ModelParameters, CMSSWParameters):
-
-    default_input_files = {
-        "CMSSW_*": ["/afs/desy.de/user/r/riegerma/public/testfile.root"],
-    }
-
-    def find_default_input_files(self):
-        for version_pattern, files in self.default_input_files.items():
-            if law.util.multi_match(self.cmssw_version, version_pattern):
-                return files
-
-        raise Exception(f"no default input files found for '{self.cmssw_version}'")
-
-    def output(self):
-        return self.local_target("cfg.py")
-
-    def run(self):
-        # prepare the output directory
-        output = self.output()
-        output.parent.touch()
-
-        # get model data
-        model_data = self.model.data
-
-        # determine input files
-        if self.input_file:
-            input_files = [self.input_file]
-            input_type = "random"
-        else:
-            input_files = self.find_default_input_files()
-            input_type = self.input_type
-
-        # prepare template variables, depending on the inference engine
-        template_vars = {}
-        engine = model_data["inference_engine"]
-        is_tf_or_onnx = engine in {"tf", "onnx"}
-        is_tfaot = engine == "tfaot"
-        if not is_tf_or_onnx and not is_tfaot:
-            raise Exception(f"unknown inference engine '{engine}'")
-
-        # common variables
-        template_vars.update({
-            "INPUT_FILES": [
-                law.target.file.add_scheme(path, "file://")
-                for path in input_files
-            ],
-            "N_EVENTS": self.n_events,
-            "INPUT_TYPE": input_type,
-            "N_CALLS": self.n_calls,
-        })
-
-        # tf / onnx specific
-        if is_tf_or_onnx:
-            # graph path
-            model_file = os.path.expandvars(os.path.expanduser(self.model_file))
-            graph_path = os.path.expandvars(os.path.expanduser(model_data["file"]))
-            template_vars["GRAPH_PATH"] = os.path.join(os.path.dirname(model_file), graph_path)
-
-            # input tensors
-            template_vars.update({
-                "INPUT_RANKS": [
-                    len(inp["shape"])
-                    for inp in model_data["inputs"]
-                ],
-                "FLAT_INPUT_SIZES": sum(
-                    (inp["shape"] for inp in model_data["inputs"]),
-                    [],
-                ),
-                "INPUT_TENSOR_NAMES": [inp["name"] for inp in model_data["inputs"]],
-            })
-
-            # output tensors
-            template_vars["OUTPUT_TENSOR_NAMES"] = [outp["name"] for outp in model_data["outputs"]]
-
-        # load the template content
-        template = f"$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/{engine}_runtime_cfg.py"
-        content = law.LocalFileTarget(template).load(formatter="text")
-
-        # replace variables
-        for key, value in template_vars.items():
-            content = content.replace(f"__{key}__", str(value))
-
-        # write the output
-        output.dump(content, formatter="text")
-
-
-class MeasureRuntime(CommandTask, RuntimeParameters, ModelParameters, CMSSWSandboxTask):
+class MeasureRuntime(
+    CMSRunCommandTask,
+    RuntimeParameters,
+    ModelParameters,
+    CMSSWSandboxTask,
+):
     """
     Task to provide the time measurements of the inference of a network in cmssw, given the input
-    parameters and a single batch size
-
-    Output is a result_batch_size_{batch_size}.csv file.
+    parameters and a single batch size.
     """
-
-    batch_size = luigi.IntParameter(
-        default=1,
-        description="the batch size to measure the runtime for; default: 1",
-    )
-    # TODO: add tfaot batch rules
-
-    def requires(self):
-        return CreateRuntimeConfig.req(self)
 
     def output(self):
         return self.local_target(f"runtime_bs{self.batch_size}.csv")
 
     def build_command(self):
-        return [
-            "cmsRun",
-            self.input().path,
-            f"batchSize={self.batch_size}",
-            f"csvFile={self.output().path}",
-        ]
+        # determine the config to run
+        engine = self.model.data["inference_engine"]
+        config_file = f"$MLP_BASE/cmssw/MLProf/RuntimeMeasurement/test/{engine}_runtime_cfg.py"
+
+        # build cmsRun command options
+        options = {
+            "inputFiles": law.target.file.add_scheme(self.input_file, "file://"),
+            "batchSize": self.batch_size,
+            "csvFile": self.output().path,
+            "inputType": "random" if self.input_data == "file" else self.input_data,
+            "maxEvents": self.n_events,
+            "nCalls": self.n_calls,
+        }
+
+        # engine specific options
+        if engine in {"tf", "onnx"}:
+            graph_path = expand_path(self.model.data["file"])
+            model_dir = expand_path(self.model_file, dir=True)
+            options.update({
+                "graphPath": os.path.normpath(os.path.join(model_dir, graph_path)),
+                "inputTensorNames": [inp["name"] for inp in self.model.data["inputs"]],
+                "outputTensorNames": [outp["name"] for outp in self.model.data["outputs"]],
+                "inputRanks": [len(inp["shape"]) for inp in self.model.data["inputs"]],
+                "flatInputSizes": sum((inp["shape"] for inp in self.model.data["inputs"]), []),
+            })
+        elif engine == "tfaot":
+            if self.tfaot_batch_rules != law.NO_STR:
+                # the cms option parser does not handle commas, even escaped, so change the format
+                batch_rules = [r.replace(",", ".") for r in self.tfaot_batch_rules.split("-")]
+                options["batchRules"] = batch_rules
+
+        return self.build_cmsrun_command(expand_path(config_file), options)
 
 
-class MergeRuntimes(RuntimeParameters, ModelParameters, CMSSWParameters, BatchSizesParameters):
+class MergeRuntimes(
+    BatchSizesParameters,
+    RuntimeParameters,
+    ModelParameters,
+    CMSSWParameters,
+):
 
     def requires(self):
         return [
@@ -163,12 +102,12 @@ class MergeRuntimes(RuntimeParameters, ModelParameters, CMSSWParameters, BatchSi
 
 
 class PlotRuntimes(
+    BatchSizesParameters,
     RuntimeParameters,
     ModelParameters,
     CMSSWParameters,
-    BatchSizesParameters,
-    PlotTask,
     CustomPlotParameters,
+    PlotTask,
 ):
     """
     Task to plot the results from the runtime measurements depending on the batch sizes given as parameters,
@@ -181,7 +120,7 @@ class PlotRuntimes(
         return MergeRuntimes.req(self)
 
     def output(self):
-        return self.local_target(f"runtime_plot_different_batch_sizes_{self.batch_sizes_repr}.pdf")
+        return self.local_target(f"runtimes_bs{self.batch_sizes_repr}.pdf")
 
     @view_output_plots
     def run(self):
@@ -200,12 +139,13 @@ class PlotRuntimes(
         print("plot saved")
 
 
-class PlotRuntimesMultipleParams(
+class PlotMultiRuntimes(
+    BatchSizesParameters,
     RuntimeParameters,
     MultiModelParameters,
-    BatchSizesParameters,
-    PlotTask,
+    MultiCMSSWParameters,
     CustomPlotParameters,
+    PlotTask,
 ):
     """
     Task to plot the results from the runtime measurements for several parameters, e.g. networks
@@ -234,6 +174,8 @@ class PlotRuntimesMultipleParams(
         if len(self.model_names) not in (n_models, 0):
             raise ValueError("the number of model names does not match the number of model files")
 
+        # TODO: refactor the combinatorics below
+
         # list of sequences over which the product is performed for the requirements
         self.product_names_req = ["model_file", "model_name", "cmssw_version", "scram_arch"]
         self.product_sequences_req = [
@@ -243,9 +185,8 @@ class PlotRuntimesMultipleParams(
         ]
 
         # list of sequences over which the product is performed for the output file name
-        self.product_names_out = ["model_name", "cmssw_version", "scram_arch"]
+        self.product_names_out = ["cmssw_version", "scram_arch"]
         self.product_sequences_out = [
-            tuple([model.full_name for model in self.models]),
             self.cmssw_versions,
             self.scram_archs,
         ]
@@ -301,18 +242,13 @@ class PlotRuntimesMultipleParams(
                 yield x
 
     def requires(self):
-        flattened_product = [
-            tuple(self.flatten_tuple(tuple_of_args)) for tuple_of_args in itertools.product(*self.product_sequences_req)
-        ]
         return [
-            MergeRuntimes.req(self, **dict(zip(self.product_names_req, values)))
-            for values in flattened_product
+            MergeRuntimes.req(self, **dict(zip(self.product_names_req, self.flatten_tuple(values))))
+            for values in itertools.product(*self.product_sequences_req)
         ]
 
     def output(self):
-        return self.local_target(
-            f"runtime_plot_{self.out_params_repr}_different_batch_sizes_{self.batch_sizes_repr}.pdf",
-        )
+        return self.local_target(f"runtimes_{self.out_params_repr}_bs{self.batch_sizes_repr}.pdf")
 
     @view_output_plots
     def run(self):
@@ -323,11 +259,10 @@ class PlotRuntimesMultipleParams(
         input_paths = [inp.path for inp in self.input()]
 
         # create the plot
-
         plot_batch_size_several_measurements(
-            self.batch_sizes,
-            input_paths,
-            output.path,
-            self.params_product_params_to_write,
-            self.custom_plot_params,
+            batch_sizes=self.batch_sizes,
+            input_paths=input_paths,
+            output_path=output.path,
+            measurements=self.params_product_params_to_write,
+            plot_params=self.custom_plot_params,
         )

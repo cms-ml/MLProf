@@ -29,25 +29,27 @@ class CMSSWSandboxTask(CMSSWParameters):
         return ""
 
     @property
-    def _cmssw_install_dir_hash(self):
-        parts = [
+    def cmssw_install_dir(self):
+        # engine representation
+        engine = self.model.data["inference_engine"]
+        engine_str = "tfaot" if engine == "tfaot" else "tf_onnx"
+
+        # hash of all signficant values
+        hash_parts = [
             self.cmssw_version,
             self.scram_arch,
             self.cmssw_setup_script,
             self.cmssw_setup_args,
         ]
-        if self.model.data["inference_engine"] == "tfaot":
+        if engine == "tfaot":
             comp_data = self.model._all_data["compilation"]
-            parts.append((
+            hash_parts.append((
                 sorted(comp_data["batch_sizes"]),
                 sorted(comp_data.get("tf_xla_flags") or []),
                 sorted(comp_data.get("xla_flags") or []),
             ))
-        return parts
 
-    @property
-    def cmssw_install_dir(self):
-        return f"{self.cmssw_version}_{law.util.create_hash(self._cmssw_install_dir_hash)}"
+        return f"{self.cmssw_version}_{engine_str}_{law.util.create_hash(hash_parts)}"
 
     @property
     def sandbox(self):
