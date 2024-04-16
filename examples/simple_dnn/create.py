@@ -3,11 +3,14 @@
 """
 Test script to create a simple DNN model.
 Best to be executed in a CMSSW environment with TensorFlow and cmsml installed.
+Will install tf2onnx for the user if not present in environment.
 
 Signature: f32(64) -> f32(8)
 """
 
 import os
+import subprocess
+import importlib.util
 
 import cmsml
 
@@ -61,6 +64,21 @@ def create_model(
     tf.saved_model.save(
         model,
         os.path.join(model_dir, f"saved_model_{_postfix}"),
+    )
+
+    # convert SavedModel to onnx
+    # install tf2onnx if necessary
+    if importlib.util.find_spec("tf2onnx") is None:
+        subprocess.run("pip3 install --user tf2onnx", shell=True)
+
+    # convert
+    subprocess.run(
+        f"""
+            python3 -m tf2onnx.convert \
+            --saved-model saved_model_{_postfix} \
+            --output onnx_graph_{_postfix}.onnx \
+        """,
+        shell=True,
     )
 
 

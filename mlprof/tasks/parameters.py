@@ -70,8 +70,8 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_14_1_X_2024-04-04-2300",
-        description="CMSSW version; default: CMSSW_14_1_X_2024-04-04-2300",
+        default="CMSSW_14_1_X_2024-04-15-2300",
+        description="CMSSW version; default: CMSSW_14_1_X_2024-04-15-2300",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
