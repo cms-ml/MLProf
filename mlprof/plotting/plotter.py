@@ -150,19 +150,20 @@ def plot_batch_size_several_measurements(
         # create legend
         ax.legend(legend_entries, measurements_labels_strs)
 
+        # additional customizations
+        apply_customizations(plot_params, fig, ax)
+
         # x axis
         ax.set_xlabel("Batch size")
         ax.xaxis.set_major_locator(plt.MaxNLocator(len(batch_sizes)))
         ax.xaxis.set_minor_locator(plt.NullLocator())
-        plt.xticks(batch_sizes, batch_sizes)  # TODO: find corresponding ax call
+        ax.set_xticks(batch_sizes)
+        ax.set_xticklabels(batch_sizes)
 
         # y axis
         ax.set_ylabel("Runtime / batch size [ms]" if plot_params["bs_normalized"] else "Runtime [ms]")
         if not plot_params.get("y_log"):
             ax.set_ylim(bottom=0)
-
-        # additional customizations
-        apply_customizations(plot_params, fig, ax)
 
         # texts
         mplhep.cms.text(text="Simulation, MLProf", loc=0)

@@ -1,0 +1,11 @@
+model:
+  name: simple_cnn_tf
+  label: TF 5x4x3
+  version: "1.0.0"
+  inference_engine: tf
+  file: ./frozen_graph_l5k3f4.pb
+  inputs:
+    - name: input
+      shape: [28,28,1]
+  outputs:
+    - name: Identity

@@ -1,0 +1,12 @@
+model:
+  name: simple_cnn_tfaot
+  label: AOT 5x4x3
+  version: "1.0.0"
+  inference_engine: tfaot
+  saved_model: ./saved_model_l5k3f4
+  serving_key: serving_default
+
+compilation:
+  batch_sizes: [1]
+  tf_xla_flags: []
+  xla_flags: []
