@@ -7,7 +7,8 @@ Collection of test tasks.
 import os
 import itertools
 
-import law
+import luigi  # type: ignore[import-untyped]
+import law  # type: ignore[import-untyped]
 
 from mlprof.tasks.base import CMSRunCommandTask, PlotTask, view_output_plots
 from mlprof.tasks.parameters import (
@@ -19,16 +20,33 @@ from mlprof.plotting.plotter import plot_batch_size_several_measurements
 from mlprof.util import expand_path
 
 
+class RemoveCMSSWSandbox(CMSSWParameters, ModelParameters, law.tasks.RunOnceTask):
+
+    @law.tasks.RunOnceTask.complete_on_success
+    def run(self):
+        sandbox_task = CMSSWSandboxTask.req(self)
+        install_dir = os.path.join("$MLP_CMSSW_BASE", sandbox_task.cmssw_install_dir)
+        law.LocalDirectoryTarget(install_dir).remove(silent=True)
+
+
 class MeasureRuntime(
     CMSRunCommandTask,
     RuntimeParameters,
-    ModelParameters,
     CMSSWSandboxTask,
 ):
     """
     Task to provide the time measurements of the inference of a network in cmssw, given the input
     parameters and a single batch size.
     """
+
+    renew_cmssw_sandbox = luigi.BoolParameter(
+        default=False,
+        description="remove the cmssw sandbox corresponding to the inference engine of the requested model first; "
+        "default: False",
+    )
+
+    def requires(self):
+        return RemoveCMSSWSandbox.req(self) if self.renew_cmssw_sandbox else []
 
     def output(self):
         return self.local_target(f"runtime_bs{self.batch_size}.csv")
@@ -61,9 +79,7 @@ class MeasureRuntime(
             })
         elif engine == "tfaot":
             if self.tfaot_batch_rules != law.NO_STR:
-                # the cms option parser does not handle commas, even escaped, so change the format
-                batch_rules = [r.replace(",", ".") for r in self.tfaot_batch_rules.split("-")]
-                options["batchRules"] = batch_rules
+                options["batchRules"] = self.tfaot_batch_rules_option
 
         return self.build_cmsrun_command(expand_path(config_file), options)
 

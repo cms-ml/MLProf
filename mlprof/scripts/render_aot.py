@@ -84,7 +84,7 @@ def render_aot(plugin_file: str, header_file: str, model_name: str) -> None:
 
 
 def parse_signatures(header_file: str) -> tuple[list[Input], list[Output]]:
-    from cms_tfaot import parse_header
+    from cms_tfaot import parse_header  # type: ignore[import-not-found]
 
     # extract header header
     header_data = parse_header(header_file)

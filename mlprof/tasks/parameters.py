@@ -4,64 +4,16 @@
 Collection of the recurrent luigi parameters for different tasks.
 """
 
-import os
+from __future__ import annotations
 
-import luigi
-import law
+import os
+import re
+
+import luigi  # type: ignore[import-untyped]
+import law  # type: ignore[import-untyped]
 
 from mlprof.tasks.base import BaseTask
-from mlprof.util import expand_path
-
-
-class Model(object):
-
-    def __init__(self, model_file: str, name: str, label: str, **kwargs) -> None:
-        super().__init__(**kwargs)
-
-        self.model_file = expand_path(model_file, abs=True)
-        self.name = name
-        self.label = label
-
-        # cached data
-        self._all_data = None
-        self._data = None
-
-    @property
-    def data(self):
-        if self._data is None:
-            all_data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
-            if "model" not in all_data:
-                raise Exception(f"model file '{self.model_file}' is missing 'model' field")
-            self._data = all_data["model"]
-            self._all_data = all_data
-        return self._data
-
-    @property
-    def full_name(self):
-        if self.name:
-            return self.name
-
-        # create a hash
-        name = os.path.splitext(os.path.basename(self.model_file))[0]
-        return f"{name}_{law.util.create_hash(self.model_file)}"
-
-    @property
-    def full_model_label(self):
-        if self.label:
-            return self.label
-
-        # get the model.label field in the model data
-        model_label = self.data.get("label")
-        if model_label:
-            return model_label
-
-        # get the model.name field in the model data
-        model_name = self.data.get("name")
-        if model_name:
-            return model_name
-
-        # fallback to the full model name
-        return self.full_name
+from mlprof.util import expand_path, Model
 
 
 class CMSSWParameters(BaseTask):
@@ -125,7 +77,7 @@ class RuntimeParameters(BaseTask):
     )
     tfaot_batch_rules = law.Parameter(
         default=law.NO_STR,
-        description="dash-separated tfaot batch rules with each being in the format 'target_size:size_1,size_2,...';"
+        description="dash-separated tfaot batch rules with each being in the format 'target_size:size_1,size_2,...'; "
         "default: empty",
     )
 
@@ -164,6 +116,27 @@ class RuntimeParameters(BaseTask):
 
         return parts
 
+    @property
+    def tfaot_batch_rules_option(self) -> list[str]:
+        if self.tfaot_batch_rules == law.NO_STR:
+            return []
+
+        def fmt_rule(r: str) -> str:
+            # interpret "ones" and "twos" as sequences of "1" and "2"
+            if m := re.match(r"^(\d+)\:(ones|twos)$", r):
+                bs = int(m.group(1))
+                s = 1 if m.group(2) == "ones" else 2
+                n = bs // s
+                n += int((n * s) < bs)
+                r = f"{bs}:{','.join(map(str, [s] * n))}"
+
+            # the cms option parser does not handle commas, even escaped, so change the format
+            r = r.replace(",", ".")
+
+            return r
+
+        return [fmt_rule(r) for r in self.tfaot_batch_rules.split("-")]
+
 
 class ModelParameters(BaseTask):
     """
@@ -171,9 +144,9 @@ class ModelParameters(BaseTask):
     """
 
     model_file = luigi.Parameter(
-        default="$MLP_BASE/examples/simple_dnn/model_tf.yaml",
+        default="$MLP_BASE/examples/simple_dnn/model_tf_l10u128.yaml",
         description="json or yaml file containing information of model to be tested; "
-        "default: $MLP_BASE/examples/simple_dnn/model_tf.yaml",
+        "default: $MLP_BASE/examples/simple_dnn/model_tf_l10u128.yaml",
     )
     model_name = luigi.Parameter(
         default=law.NO_STR,
@@ -230,11 +203,13 @@ class MultiModelParameters(BaseTask):
         description="comma-separated list of names of models defined in --model-files to use in output paths "
         "instead of a hashed version of model_files; when set, the number of names must match the number of "
         "model files; default: ()",
+        brace_expand=True,
     )
     model_labels = law.CSVParameter(
         default=law.NO_STR,
         description="when set, use this label in plots; when empty, the 'network_name' field in the "
         "model json data is used when existing, and full_model_name otherwise; default: empty",
+        brace_expand=True,
     )
 
     def __init__(self, *args, **kwargs):
@@ -301,9 +276,9 @@ class CustomPlotParameters(BaseTask):
     """
 
     x_log = luigi.BoolParameter(
-        default=True,
+        default=False,
         significant=False,
-        description="plot the x-axis logarithmically; default: True",
+        description="plot the x-axis logarithmically; default: False",
     )
     y_log = luigi.BoolParameter(
         default=False,

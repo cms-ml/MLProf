@@ -113,7 +113,7 @@ def plot_batch_size_several_measurements(
     plot_params: dict. The dictionary containing the customization parameters.
     """
     import matplotlib.pyplot as plt
-    import mplhep
+    import mplhep  # type: ignore[import-untyped]
 
     if isinstance(measurements[0], str):
         measurements_labels_strs = list(measurements)
@@ -143,7 +143,7 @@ def plot_batch_size_several_measurements(
                 y_down=data["y_down"],
                 y_up=data["y_up"],
                 error_style=plot_params["error_style"],
-                color=next(ax._get_lines.prop_cycler)["color"],
+                color=ax._get_lines.get_next_color(),
             )
             legend_entries.append(entry)
 
