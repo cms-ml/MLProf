@@ -12,10 +12,9 @@
 *.npz
 *.h5
 *.hdf5
-*.json
-*.yaml
 *.out
 *.parquet
+*.vscode
 .coverage
 coverage*.xml
 __pycache__
@@ -28,3 +27,4 @@ software
 data
 .data
 .law
+.python-version

@@ -4,54 +4,16 @@
 Collection of the recurrent luigi parameters for different tasks.
 """
 
-import os
+from __future__ import annotations
 
-import luigi
-import law
+import os
+import re
+
+import luigi  # type: ignore[import-untyped]
+import law  # type: ignore[import-untyped]
 
 from mlprof.tasks.base import BaseTask
-
-
-class Model(object):
-
-    def __init__(self, model_file: str, name, label, **kwargs):
-
-        super().__init__(**kwargs)
-
-        self.model_file = os.path.abspath(os.path.expandvars(os.path.expanduser(model_file)))
-        self.name = name
-        self.label = label
-
-        # cached data
-        self._data = None
-
-    @property
-    def data(self):
-        if self._data is None:
-            self._data = law.LocalFileTarget(self.model_file).load(formatter="yaml")
-        return self._data
-
-    @property
-    def full_name(self):
-        if self.name:
-            return self.name
-
-        # create a hash
-        name = os.path.splitext(os.path.basename(self.model_file))[0]
-        return f"{name}{law.util.create_hash(self.model_file)}"
-
-    @property
-    def full_model_label(self):
-        if self.label:
-            return self.label
-
-        # get the network_name field in the model data
-        network_name = self.data.get("network_name")
-        if network_name:
-            return network_name
-
-        # fallback to the full model name
-        return self.full_name
+from mlprof.util import expand_path, Model
 
 
 class CMSSWParameters(BaseTask):
@@ -60,8 +22,8 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_13_3_3",
-        description="CMSSW version; default: CMSSW_13_3_3",
+        default="CMSSW_14_1_X_2024-04-15-2300",
+        description="CMSSW version; default: CMSSW_14_1_X_2024-04-15-2300",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
@@ -77,14 +39,29 @@ class CMSSWParameters(BaseTask):
         return parts
 
 
+class MultiCMSSWParameters(BaseTask):
+
+    cmssw_versions = law.CSVParameter(
+        default=(CMSSWParameters.cmssw_version._default,),
+        description=f"comma-separated list of CMSSW versions; default: ({CMSSWParameters.cmssw_version._default},)",
+        brace_expand=True,
+    )
+    scram_archs = law.CSVParameter(
+        default=(CMSSWParameters.scram_arch._default,),
+        description=f"comma-separated list of SCRAM architectures; default: ({CMSSWParameters.scram_arch._default},)",
+        brace_expand=True,
+    )
+
+
 class RuntimeParameters(BaseTask):
     """
     General parameters for the model definition and the runtime measurement.
     """
 
-    input_type = luigi.Parameter(
+    input_data = luigi.Parameter(
         default="random",
-        description="either 'random', 'incremental', 'zeros', or a path to a root file; default: random",
+        description="either 'random', 'incremental', 'zeros', 'ones', or a path to a root file; "
+        "default: random",
     )
     n_events = luigi.IntParameter(
         default=1,
@@ -94,32 +71,71 @@ class RuntimeParameters(BaseTask):
         default=100,
         description="number of evaluation calls for averaging; default: 100",
     )
+    batch_size = luigi.IntParameter(
+        default=1,
+        description="the batch size to measure the runtime for; default: 1",
+    )
+    tfaot_batch_rules = law.Parameter(
+        default=law.NO_STR,
+        description="dash-separated tfaot batch rules with each being in the format 'target_size:size_1,size_2,...'; "
+        "default: empty",
+    )
+
+    default_input_file = "/afs/desy.de/user/r/riegerma/public/testfile.root"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # verify the input type
-        self.input_file = None
-        if self.input_type not in ("random", "incremental", "zeros"):
-            self.input_file = os.path.abspath(os.path.expandvars(os.path.expanduser(self.input_type)))
+        # verify the input data
+        self.input_file = self.default_input_file
+        known_input_data = {"random", "incremental", "zeros", "ones"}
+        if self.input_data not in known_input_data:
+            self.input_file = expand_path(self.input_data, abs=True)
             if not os.path.exists(self.input_file):
                 raise ValueError(
-                    f"input type '{self.input_type}' is neither 'random' nor 'incremental' nor 'zeros' nor "
-                    f"a path to an existing root file",
+                    f"invalid input data '{self.input_data}', must be a file or any of {','.join(known_input_data)}",
                 )
+            self.input_data = "file"
 
     def store_parts(self):
         parts = super().store_parts()
 
         # build a combined string that represents the significant parameters
+        input_str = f"file{law.util.create_hash(self.input_file)}" if self.input_data == "file" else self.input_data
         params = [
-            f"input_{law.util.create_hash(self.input_file) if self.input_file else self.input_type}",
+            f"input_{input_str}",
             f"nevents_{self.n_events}",
             f"ncalls_{self.n_calls}",
         ]
+
+        # optional parts
+        if self.tfaot_batch_rules:
+            params.append(f"tfaotrules_{self.tfaot_batch_rules}")
+
         parts.insert_before("version", "runtime_params", "__".join(params))
 
         return parts
+
+    @property
+    def tfaot_batch_rules_option(self) -> list[str]:
+        if self.tfaot_batch_rules == law.NO_STR:
+            return []
+
+        def fmt_rule(r: str) -> str:
+            # interpret "ones" and "twos" as sequences of "1" and "2"
+            if m := re.match(r"^(\d+)\:(ones|twos)$", r):
+                bs = int(m.group(1))
+                s = 1 if m.group(2) == "ones" else 2
+                n = bs // s
+                n += int((n * s) < bs)
+                r = f"{bs}:{','.join(map(str, [s] * n))}"
+
+            # the cms option parser does not handle commas, even escaped, so change the format
+            r = r.replace(",", ".")
+
+            return r
+
+        return [fmt_rule(r) for r in self.tfaot_batch_rules.split("-")]
 
 
 class ModelParameters(BaseTask):
@@ -128,14 +144,14 @@ class ModelParameters(BaseTask):
     """
 
     model_file = luigi.Parameter(
-        default="$MLP_BASE/examples/simple_dnn/model_tf.json",
-        description="json file containing information of model to be tested; "
-        "default: $MLP_BASE/examples/simple_dnn/model_tf.json",
+        default="$MLP_BASE/examples/simple_dnn/model_tf_l10u128.yaml",
+        description="json or yaml file containing information of model to be tested; "
+        "default: $MLP_BASE/examples/simple_dnn/model_tf_l10u128.yaml",
     )
     model_name = luigi.Parameter(
         default=law.NO_STR,
-        description="when set, use this name for storing outputs instead of a hashed version of "
-        "--model-file; default: empty",
+        description="when set, use this name for storing outputs instead of a hashed version of --model-file; "
+        "default: empty",
     )
     model_label = luigi.Parameter(
         default=law.NO_STR,
@@ -148,7 +164,7 @@ class ModelParameters(BaseTask):
         params = super().modify_param_values(params)
 
         if params.get("model_file"):
-            params["model_file"] = os.path.abspath(os.path.expandvars(os.path.expanduser(params["model_file"])))
+            params["model_file"] = expand_path(params["model_file"], abs=True)
 
         return params
 
@@ -187,11 +203,13 @@ class MultiModelParameters(BaseTask):
         description="comma-separated list of names of models defined in --model-files to use in output paths "
         "instead of a hashed version of model_files; when set, the number of names must match the number of "
         "model files; default: ()",
+        brace_expand=True,
     )
     model_labels = law.CSVParameter(
         default=law.NO_STR,
         description="when set, use this label in plots; when empty, the 'network_name' field in the "
         "model json data is used when existing, and full_model_name otherwise; default: empty",
+        brace_expand=True,
     )
 
     def __init__(self, *args, **kwargs):
@@ -227,17 +245,17 @@ class MultiModelParameters(BaseTask):
         parts = super().store_parts()
 
         # build a combined string that represents the significant parameters
-        params = [
-            f"model_{model.full_name}" for model in self.models
-        ]
-        parts.insert_before("version", "model_params", "__".join(params))
+        names = [model.full_name for model in self.models]
+        if len(names) >= 5:
+            names = [f"{len(names)}x{law.util.create_hash(names)}"]
+        parts.insert_before("version", "model_params", f"models__{'__'.join(names)}")
 
         return parts
 
 
 class BatchSizesParameters(BaseTask):
     """
-    Parameter to add several batch sizes to perform the measurement on
+    Parameters to control batch sizes.
     """
 
     batch_sizes = law.CSVParameter(
@@ -254,28 +272,54 @@ class BatchSizesParameters(BaseTask):
 
 class CustomPlotParameters(BaseTask):
     """
-    Parameters for customization of plotting
+    Parameters plotting customizations.
     """
 
-    log_y = luigi.BoolParameter(
+    x_log = luigi.BoolParameter(
         default=False,
-        description="plot the y-axis values logarithmically; default: False",
+        significant=False,
+        description="plot the x-axis logarithmically; default: False",
+    )
+    y_log = luigi.BoolParameter(
+        default=False,
+        significant=False,
+        description="plot the y-axis logarithmically; default: False",
+    )
+    y_min = luigi.FloatParameter(
+        default=law.NO_FLOAT,
+        significant=False,
+        description="minimum y-axis value; default: empty",
+    )
+    y_max = luigi.FloatParameter(
+        default=law.NO_FLOAT,
+        significant=False,
+        description="maximum y-axis value; default: empty",
     )
     bs_normalized = luigi.BoolParameter(
         default=True,
+        significant=False,
         description="normalize the measured values with the batch size; default: True",
     )
-    filling = luigi.BoolParameter(
-        default=True,
-        description="plot the errors as error bands instead of error bars; default: True",
+    error_style = luigi.ChoiceParameter(
+        choices=["bars", "band"],
+        default="band",
+        significant=False,
+        description="style of errors / uncerainties of due to averaging; choices: bars,band; default: band",
     )
     top_right_label = luigi.Parameter(
-        default="",
+        default=law.NO_STR,
+        significant=False,
         description="stick a label over the top right corner of the plot",
     )
 
     @property
     def custom_plot_params(self):
-        return {"log_y": self.log_y, "bs_normalized": self.bs_normalized, "filling": self.filling,
-                "top_right_label": self.top_right_label,
-                }
+        return {
+            "x_log": self.x_log,
+            "y_log": self.y_log,
+            "y_min": self.y_min if self.y_min != law.NO_FLOAT else None,
+            "y_max": self.y_max if self.y_max != law.NO_FLOAT else None,
+            "bs_normalized": self.bs_normalized,
+            "error_style": self.error_style,
+            "top_right_label": None if self.top_right_label == law.NO_STR else self.top_right_label,
+        }

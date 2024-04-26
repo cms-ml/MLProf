@@ -31,9 +31,9 @@ public:
   static void globalEndJob(const ONNXRuntime*);
 
 private:
-  void beginJob();
+  void beginJob(){};
   void analyze(const edm::Event&, const edm::EventSetup&);
-  void endJob();
+  void endJob(){};
 
   inline float drawNormal() { return normalPdf_(rndGen_); }
 
@@ -76,10 +76,9 @@ void ONNXInference::fillDescriptions(edm::ConfigurationDescriptions& description
   // the rank (number of dimensions) of each input tensor
   desc.add<std::vector<int>>("inputRanks");
   // flat list of sizes of each dimension of each input tensor
-  // (for a graph with a 1D and a 2D input tensor, this would be a vector of
-  // three values)
+  // (for a graph with a 1D and a 2D input tensor, this would be a vector of three values)
   desc.add<std::vector<int>>("flatInputSizes");
-  // batch sizes to test
+  // batch size to test
   desc.add<int>("batchSize");
   // the number of calls to the graph to measure the runtime
   desc.add<int>("nCalls");
@@ -133,9 +132,10 @@ ONNXInference::ONNXInference(const edm::ParameterSet& iConfig, const ONNXRuntime
     inputType_ = mlprof::InputType::Random;
   } else if (inputTypeStr_ == "zeros") {
     inputType_ = mlprof::InputType::Zeros;
+  } else if (inputTypeStr_ == "ones") {
+    inputType_ = mlprof::InputType::Ones;
   } else {
-    throw cms::Exception("InvalidInputType")
-        << "input type must be either 'incremental', 'zeros' or 'random', got " << inputTypeStr_;
+    throw cms::Exception("InvalidInputType") << "input type unknown: " << inputTypeStr_;
   }
 
   // initialize the input_shapes array with inputRanks_ and flatInputSizes_
@@ -147,10 +147,12 @@ ONNXInference::ONNXInference(const edm::ParameterSet& iConfig, const ONNXRuntime
     i += rank;
   }
   // initialize the input data arrays
-  // note there is only one element in the FloatArrays type (i.e.
-  // vector<vector<float>>) variable
+  // note there is only one element in the FloatArrays type (i.e. vector<vector<float>>) variable
   for (int i = 0; i < nInputs_; i++) {
-    inputArrays_.emplace_back(batchSize_ * flatInputSizes_[i], 0);
+    // multiply the size of all dimensions in an input
+    int full_size_input = std::accumulate(begin(input_shapes_[i]), end(input_shapes_[i]), 1, std::multiplies<int>());
+    // initialize inputArrays_ with 0s at first
+    inputArrays_.emplace_back(full_size_input, 0);
   }
 }
 
@@ -167,7 +169,7 @@ void ONNXInference::analyze(const edm::Event& iEvent, const edm::EventSetup& iSe
     for (int i = 0; i < (int)group_data.size(); i++) {
       group_data[i] = inputType_ == mlprof::InputType::Incremental
                           ? float(i)
-                          : (inputType_ == mlprof::InputType::Zeros ? float(0) : drawNormal());
+                          : float(inputType_ == mlprof::InputType::Zeros ? 0 : drawNormal());
     }
   }
 
@@ -183,7 +185,10 @@ void ONNXInference::analyze(const edm::Event& iEvent, const edm::EventSetup& iSe
   std::vector<float> runtimes;
   for (int r = 0; r < nCalls_; r++) {
     auto start = std::chrono::high_resolution_clock::now();
+
+    // inference
     outputs = globalCache()->run(inputTensorNames_, inputArrays_, input_shapes_, outputTensorNames_, batchSize_);
+
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> runtime_in_seconds = (end - start);
     runtimes.push_back(runtime_in_seconds.count() * 1000);

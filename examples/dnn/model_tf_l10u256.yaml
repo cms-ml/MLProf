@@ -1,0 +1,11 @@
+model:
+  name: simple_dnn_tf
+  label: TF 10x256
+  version: "1.0.0"
+  inference_engine: tf
+  file: ./frozen_graph_l10u256.pb
+  inputs:
+    - name: input
+      shape: [64]
+  outputs:
+    - name: Identity

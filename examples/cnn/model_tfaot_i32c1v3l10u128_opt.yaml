@@ -1,0 +1,14 @@
+model:
+  name: simple_cnn_tfaot
+  label: TFAOT 32x1$\circledast$3$\rightarrow$10x128
+  version: "1.0.0"
+  inference_engine: tfaot
+  saved_model: ./saved_model_i32c1v3l10u128
+  serving_key: serving_default
+
+compilation:
+  batch_sizes: [1]
+  tf_xla_flags: []
+  xla_flags:
+    - --xla_cpu_use_xla_runtime=true
+    - --xla_cpu_enable_fast_math=true

@@ -1,0 +1,12 @@
+model:
+  name: simple_dnn_tfaot
+  label: AOT 10x256 BS
+  version: "1.0.0"
+  inference_engine: tfaot
+  saved_model: ./saved_model_l10u256
+  serving_key: serving_default
+
+compilation:
+  batch_sizes: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+  tf_xla_flags: []
+  xla_flags: []
