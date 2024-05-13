@@ -1,0 +1,11 @@
+model:
+  name: simple_dnn_onnx
+  label: ONNX 20x128
+  version: "1.0.0"
+  inference_engine: onnx
+  file: ./onnx_graph_l20u128.onnx
+  inputs:
+    - name: input
+      shape: [64]
+  outputs:
+    - name: output

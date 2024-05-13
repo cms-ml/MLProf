@@ -1,0 +1,11 @@
+model:
+  name: simple_cnn_tf
+  label: TF 32x1$\circledast$3$\rightarrow$10x128
+  version: "1.0.0"
+  inference_engine: tf
+  file: ./frozen_graph_i32c1v3l10u128.pb
+  inputs:
+    - name: input
+      shape: [1024]
+  outputs:
+    - name: Identity

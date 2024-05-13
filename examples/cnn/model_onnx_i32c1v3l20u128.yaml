@@ -1,0 +1,11 @@
+model:
+  name: simple_cnn_onnx
+  label: ONNX 32x1$\circledast$3$\rightarrow$20x128
+  version: "1.0.0"
+  inference_engine: onnx
+  file: ./onnx_graph_i32c1v3l20u128.onnx
+  inputs:
+    - name: input
+      shape: [1024]
+  outputs:
+    - name: output

@@ -1,11 +1,5 @@
 # version 1
 
-luigi~=3.3
-six~=1.16
-pyyaml==6.*
-
-# debugging
-ipython~=7.16
-flake8~=4.0
-flake8-commas~=2.1
-flake8-quotes~=3.3
+luigi
+six
+pyyaml

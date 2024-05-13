@@ -1,6 +1,6 @@
 # MLProf
 
-[![Lint and test](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml/badge.svg)](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml)
+[![Lint and test](https://github.com/cms-ml/MLProf/actions/workflows/lint_and_test.yml/badge.svg)](https://github.com/cms-ml/MLProf/actions/workflows/lint_and_test.yml)
 
 Tools for automated ML model performance tests in CMSSW (CMSSW version 13 and above).
 
@@ -24,7 +24,7 @@ law run PlotRuntimes --version test_mlprof
 ## Law introduction
 
 As you can already see from the Quickstart section, this tool uses [law](https://github.com/riga/law) for the orchestration.
-Therefore, a short introduction to the most essential functions of law you should be aware of when using this tool are provided here.
+Therefore, a short introduction to the most essential functions of law you should be aware of when using this tool is provided here.
 More informations are available for example in the "[Examples](https://github.com/riga/law#examples)" section of this [Github repository](https://github.com/riga/law).
 This section can be ignored if you are already familiar with law.
 
@@ -38,10 +38,10 @@ The tree of runtime tasks in MLPROF is:
 
 ```mermaid
 flowchart TD
-    A[CreateRuntimeConfig] --> B[MeasureRuntime]
-    B --> |merge the results for different batch sizes| C[MergeRuntimes]
-    C --> D[PlotRuntimes]
-    C --> E[PlotRuntimesMultipleParams]
+    A[MeasureRuntime]
+    A --> |merge the results for different batch sizes| B[MergeRuntimes]
+    B --> C[PlotRuntimes]
+    B --> D[PlotMultiRuntimes]
 ```
 
 A task is run with the command `law run` followed by the name of the task.
@@ -83,8 +83,9 @@ law run PlotRuntimes --version test_mlprof --print-output 0
 ## Profiling
 
 This tools uses the c++ `<chrono>` library for runtime measurements and (soon) [IgProf](https://igprof.org/) for the memory profiling.
-It allows for the measurement of TensorFlow graphs (.pb) and ONNX models (.onnx) with several input layers.
+It allows for the measurement of TensorFlow graphs (.pb), AOT-compiled models and ONNX models (.onnx) with several input layers.
 As this tool is set to work in CMSSW, it requires a frozen graph for TensorFlow models (it is recommended to use the cmsml [save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph) function with the argument "True" for variables_to_constant).
+For models to be tested with AOT-compilation, the saved_model directory is required for the compilation of the model in CMSSW (it is recommended to use [tf.saved_model.save](https://www.tensorflow.org/api_docs/python/tf/saved_model/save)).
 
 
 ## Runtime measurement
@@ -93,127 +94,128 @@ The dependency graph for the runtime measurement looks as follows:
 
 ```mermaid
 flowchart TD
-    A[CreateRuntimeConfig] --> B[MeasureRuntime]
-    B --> |merge the results for different batch sizes| C[MergeRuntimes]
-    C --> D[PlotRuntimes]
-    C --> E[PlotRuntimesMultipleParams]
+    A[MeasureRuntime]
+    A --> |merge the results for different batch sizes| B[MergeRuntimes]
+    B --> C[PlotRuntimes]
+    B --> D[PlotMultiRuntimes]
 ```
 
 It is composed of four major types of tasks:
 
-1. [CreateRuntimeConfig](#createruntimeconfig): This task creates the cmssw config file to run the inference, using a json file for the model parameters.
+1. [MeasureRuntime](#measureruntime): This task runs the network as many times as demanded in the arguments for a single batch size and outputs a .csv file with the results of the timing measurements. The parameters from the model-file and the given arguments are parsed to the cmssw environment using the template configs in the repository.
 
-2. [MeasureRuntime](#measureruntime): This task runs the network as many times as demanded in the arguments for a single batch size and outputs a .csv file with the results of the timing measurements.
+2. [MergeRuntimes](#mergeruntimes): This task merges the .csv output files with the required multiple batch sizes from the [MeasureRuntime](#measureruntime) tasks to obtain a single .csv file containing the informations to plot.
 
-3. [MergeRuntimes](#mergeruntimes): This task merges the .csv output files with the required multiple batch sizes from the [MeasureRuntime](#measureruntime) tasks to obtain a single .csv file containing the informations to plot.
-
-4. [PlotRuntimes](#plotruntimes), [PlotRuntimesMultipleParams](#plotruntimesmultipleparams): These tasks create the plots with the values stored in the .csv file from [MergeRuntimes](#mergeruntimes).
+3. [PlotRuntimes](#plotruntimes), [PlotMultiRuntimes](#plotmultiruntimes): These tasks create the plots with the values stored in the .csv file from [MergeRuntimes](#mergeruntimes).
 
 Calling the [PlotRuntimes](#plotruntimes) task triggers the whole pipeline with the correct arguments.
 
-The way to give the necessary informations about your model to MLProf is by using a json file.
-Its structure is presented below in [Model file in json format](#model-file-in-json-format).
+The way to give the necessary informations about your model to MLProf is by using a yaml file.
+Its structure is presented below in [Model file in yaml format](#model-file-in-yaml-format).
 
-# Model file in json format
+# Model file and config in yaml format
 
-The format of the file to give to MLProf is the following:
+MLProf can provide measurements for three inference tools already implemented in CMSSW.
+For an inference in tensorflow, a frozen graph  of the model to be tested is needed (in .pb-format, created for example with [cmsml.tensorflow.save_graph](https://cmsml.readthedocs.io/en/latest/api/tensorflow.html#cmsml.tensorflow.save_graph)).
+For an inference in ONNX, the .onnx file of the model to be tested is needed.
+For an inference in AOT, the model will be compiled using the [CMSSW-AOT tool](https://cms-ml.github.io/documentation/inference/tensorflow_aot.html), therefore a saved_model, for example created with [tf.saved_model.save](https://www.tensorflow.org/api_docs/python/tf/saved_model/save), is needed.
 
-```json
-{
-    "file": "{path_to_your_pb_model_file}",
-    "inputs": [
-        {
-            "name": "{name_input_layer_1}",
-            "shape": [size_dimension_1, size_dimension_2, ...]
-        },
-        {
-            "name": "{name_input_layer_2}",
-            "shape": [size_dimension_1, size_dimension_2, ...]
-        },
-        ...
-    ],
-    "outputs": [
-        {
-            "name": "{name_of_the_output_layer_1}"
-        },
-        {
-            "name": "{name_of_the_output_layer_2}"
-        },
-        ...
-    ],
-    "inference_engine": "{name_of_inference_engine_(either_tf_or_onnx)}",
-    "network_name": "{optional_name_of_the_network_for_the_labels}"
-}
+
+In MLProf, the parameters of the models to be tested are to be given to a config file in .yaml format.
+Depending on the inference tool to be used, there are two possible formats for the model file.
+If tensorflow or onnx is to be used as inference engine, the yaml file should be in the following format:
+
+```yaml
+model:
+  name: optional_default_name_of_the_network_for_the_storage_path
+  label: optional default label of the network for the plots
+  version: optional_version_number # (e.g. "1.0.0")
+  inference_engine: name_of_inference_engine  # (either "tf" or "onnx")
+  file: path_to_your_pb_or_onnx_model_file
+  inputs:
+    - name: name_input_layer_1
+      shape: [size_dimension_1, size_dimension_2, ...]
+    - name: name_input_layer_2
+      shape: [size_dimension_1, size_dimension_2, ...]
+    ...
+  outputs:
+    - name: name_of_the_output_layer_1
+    - name: name_of_the_output_layer_2
+    ...
 ```
-There are already a few examples of these configs with working paths for the networks in the "examples" folder.
 
-# CreateRuntimeConfig
+For a model to be compiled in AOT, the parameters for the compilation in CMSSW are needed.
+Therefore, for each model-file with tfaot as inference engine, CMSSW will be compiled anew, with the corresponding AOT-compilation parameters.
+On the other hand, the inputs and outputs will be taken from the saved model and are therefore not needed.
+Hence, the yaml file should be in the following format:
 
-This task create the CMSSW config file to run the inference in the corresponding task, using the template file in the `cmssw/MLProf/RuntimeModule/test/` directory.
-The parameters of the inference except the batch sizes are fixed by the created configuration file, therefore this task will be run again for every change in the inference (e.g. the number of runs for the statistics, the path to the graph to check...).
+```yaml
+model:
+  name: optional_default_name_of_the_network_for_the_storage_path
+  label: optional default label of the network for the plots
+  version: version_number  # (e.g. "1.0.0")
+  inference_engine: tfaot
+  saved_model: path_to_your_saved_model_directory
+  serving_key: serving_default  # key of model to take from saved_model drectory
 
-## Parameters:
+compilation:  # defines the way the saved_model should be compiled in CMSSW, only for AOT models, arguments from CMSSW
+  batch_sizes: [batch_size_1, batch_size_2, ...]  # the batch sizes for which the model is compiled
+  tf_xla_flags: []  # flags for the conversion to XLA
+  xla_flags: []  # flags for the optimization in XLA
 
-- model-file: str. The absolute path of the json file containing the informations of the model to be tested. default: `$MLP_BASE/examples/simple_dnn/model.json`.
-
-- model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of `--model-file`. default: empty.
-
-- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `network_name` field in the model json data is used when existing, and model-name otherwise. default: empty.
-
-- n-events: int. The number of events to read from each input file for averaging measurements. default: `1`.
-
-- n-calls: int. The number of calls to be performed per evaluation for averaging. default: `100`.
-
-- input-type: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', or a path to a root file. default: random
-
-- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_13_3_1`.
-
-- scram-arch: str. The SCRAM architecture used for the inference. default: `slc7_amd64_gcc12`.
-
-## Output:
-
-- `cfg.py`: The config file for the `RuntimeModule` in `cmssw/MLProf`.
-
-## Example:
-
-```shell
-law run CreateRuntimeConfig \
-    --version test_simple_dnn \
-    --model-file "$MLP_BASE/examples/simple_dnn/model.json" \
-    --model-name dnn \
-    --n-calls 500 \
-    --cmssw-version CMSSW_13_3_1
 ```
+
+More information on AOT-compilation and the compilation parameters can be found in the [cms-ml AOT documentation](https://cms-ml.github.io/documentation/inference/tensorflow_aot.html).
+
+A few examples of such configs with working paths for the networks can be found in the "examples" folder, along with the python scripts to create and save these models.
+
+# AOT models
+
+While the inference on graphs (done for TensorFlow and ONNX models) is fairly easily understandable conceptually, as it consists of running the MLProf Plugin for a compiled CMSSW version, the whole mechanism is much more complicated for AOT-compiled model.
+AOT-compiled models are directly compiled within CMSSW.
+Therefore, a new instance of CMSSW with the corresponding compiled models must be created and compiled for each `model-file`.
+The compilation parameters are given through the `compilation` key in the model-file, as shown in [Model file and config in yaml format](#model-file-and-config-in-yaml-format).
+
+The automatized procedure to run an AOT-compiled model with an MLProf Plugin is as follows:
+- First, the SavedModel is pre-compiled in CMSSW (available from CMSSW_14_1_0_pre3 on).
+- Then, a script modifies the MLProf AOT Plugin such that the plugin is adapted to the compiled model.
+- CMSSW is then compiled with the modified MLProf AOT Plugin and the corresponding models.
+- Finally, the inference can run on the compiled models using the MLProf AOT Plugin.
+
+All these steps are done in the backgrounds, so the user only needs to provide the model-file and start a meassurement for this to happen.
+
+It is possible to test the AOT models with different batch sizes than the ones they were compiled with in CMSSW, using stitching and padding.
+The default behaviour for this procedure is described in the [cms-ml AOT documentation](https://cms-ml.github.io/documentation/inference/tensorflow_aot.html#default-rules-and-optimization).
+Users can also define with compiled models should be stitched together/padded for the inference by using the `--tfaot-batch-rules` parameter described below.
 
 
 # MeasureRuntime
 
-Task to provide the time measurements of the inference of a network in CMSSW, given the input parameters and a single batch size.
+Task to provide the time measurements of the inference of a network in CMSSW, given the input parameters, the model-file and a single batch size.
 The batch size and the (```n-calls * n-events```) measured values in milliseconds are saved in csv format.
-
-## Requires:
-
-- The config file created by `CreateRuntimeConfig`.
+For AOT-compiled models, the `--tfaot-batch-rules` parameter allows to choose which compiled models are to be used to compose the batch size to be measured.
 
 ## Parameters:
 
 - batch-size: int. the batch size to measure the runtime for. default: `1`.
 
-- model-file: str. The absolute path of the json file containing the informations of the model to be tested. default: `$MLP_BASE/examples/simple_dnn/model.json`.
+- model-file: str. The absolute path of the yaml file containing the informations of the model to be tested. default: `$MLP_BASE/examples/dnn/model_tf_l10u128.yaml`.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of `--model-file`. default: empty.
 
-- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `network_name` field in the model json data is used when existing, and model-name otherwise. default: empty.
+- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `label` field in the model yaml data is used when existing, else the `name` field in the model yaml data is used when existing and model-name otherwise. default: empty.
 
 - n-events: int. The number of events to read from each input file for averaging measurements. default: `1`.
 
 - n-calls: int. The number of calls to be performed per evaluation for averaging. default: `100`.
 
-- input-type: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', or a path to a root file. default: random
+- input-data: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', 'ones', or a path to a root file. default: random
 
-- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_13_3_1`.
+- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_14_1_0_pre3`.
 
 - scram-arch: str. The SCRAM architecture used for the inference. default: `slc7_amd64_gcc12`.
+
+- tfaot-batch-rules: str. The dash-separated batch rules used for the inference on tfaot models with each being in the format 'target_size:size_1,size_2,...'. default: empty
 
 ## Output:
 - `runtime_bs_{batch-size}.csv`: The batch size and measured values of the runtime
@@ -223,11 +225,34 @@ for each repetition and event.
 
 ```shell
 law run MeasureRuntime --version test_simple_dnn \
-                       --model-file $MLP_BASE/examples/simple_dnn/model.json \
+                       --model-file $MLP_BASE/examples/dnn/model_tf_l10u128.yaml \
                        --model-name dnn \
                        --n-calls 500 \
-                       --cmssw-version CMSSW_13_3_1 \
+                       --cmssw-version CMSSW_14_1_0_pre3 \
                        --batch-size 1
+```
+
+AOT model:
+
+```shell
+law run MeasureRuntime --version test_aot_model \
+                       --model-file $MLP_BASE/examples/dnn/model_tfaot_l10u128.yaml \
+                       --model-name AOT_dnn \
+                       --n-calls 500 \
+                       --cmssw-version CMSSW_14_1_0_pre3 \
+                       --batch-size 1
+```
+
+AOT model with different batch sizes for compilation and inference, without using default behaviour:
+
+```shell
+law run MeasureRuntime --version test_aot_model \
+                       --model-file $MLP_BASE/examples/dnn/model_tfaot_l10u256_bs.yaml \
+                       --model-name AOT_dnn \
+                       --n-calls 500 \
+                       --cmssw-version CMSSW_14_1_0_pre3 \
+                       --batch-size 15 \
+                       --tfaot-batch-rules "15:1,2,1,1,2,8"
 ```
 
 
@@ -241,33 +266,35 @@ This task merges the .csv output files with the required multiple batch sizes fr
 ## Parameters:
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: `1,2,4`.
 
-- model-file: str. The absolute path of the json file containing the informations of the model to be tested. default: `$MLP_BASE/examples/simple_dnn/model.json`.
+- model-file: str. The absolute path of the yaml file containing the informations of the model to be tested. default: `$MLP_BASE/examples/dnn/model_tf_l10u128.yaml`.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of `--model-file`. default: empty.
 
-- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `network_name` field in the model json data is used when existing, and model-name otherwise. default: empty.
+- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `label` field in the model yaml data is used when existing, else the `name` field in the model yaml data is used when existing, and model-name otherwise. default: empty.
 
 - n-events: int. The number of events to read from each input file for averaging measurements. default: `1`.
 
 - n-calls: int. The number of calls to be performed per evaluation for averaging. default: `100`.
 
-- input-type: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', or a path to a root file. default: random
+- input-data: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', 'ones', or a path to a root file. default: random
 
-- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_13_3_1`
+- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_14_1_0_pre3`
 
 - scram-arch: str. The SCRAM architecture used for the inference. default: `slc7_amd64_gcc12`
 
+- tfaot-batch-rules: str. The dash-separated batch rules used for the inference on tfaot models with each being in the format 'target_size:size_1,size_2,...'. default: empty
+
 ## Output:
-- `runtime_bs_{batch_size_1}_{batch_size_2}_{...}.csv`: The batch size and measured values of the runtime for each repetition and event in the several measurements.
+- `runtimes_bs_{batch_size_1}_{batch_size_2}_{...}.csv`: The batch size and measured values of the runtime for each repetition and event in the several measurements.
 
 ## Example:
 
 ```shell
 law run MergeRuntimes --version test_simple_dnn \
-                      --model-file $MLP_BASE/examples/simple_dnn/model.json \
+                      --model-file $MLP_BASE/examples/dnn/model_tf_l10u128.yaml \
                       --model-name dnn \
                       --n-calls 500 \
-                      --cmssw-version CMSSW_13_3_1 \
+                      --cmssw-version CMSSW_14_1_0_pre3 \
                       --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024
 ```
 
@@ -281,29 +308,35 @@ The number of inferences behind one plotted data point is given by `n-events * n
 - The .csv file from the `MergeRuntimes` task.
 
 ## Parameters:
-- log-y: bool. Plot the y-axis values logarithmically; default: `False`.
+- y-log: bool. Plot the y-axis values logarithmically; default: `False`.
+
+- x-log: bool. Plot the x-axis values logarithmically; default: `False`.
+
+- y-min = float. Minimum y-axis value. default: empty
+
+- y-max: float. Maximum y-axis value. default: empty
 
 - bs-normalized: bool. Normalize the measured values with the batch size before plotting; default: `True`.
 
-- filling: bool. Plot the errors as error bands instead of error bars; default: `True`.
+- error-style: str. Style of errors / uncertainties due to averaging; choices: `bars`,`band`; default: `band`.
 
 - top-right-label: str. When set, stick this string as label over the top right corner of the plot. default: empty.
 
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: `1,2,4`.
 
-- model-file: str. The absolute path of the json file containing the informations of the model to be tested. default: `$MLP_BASE/examples/simple_dnn/model.json`.
+- model-file: str. The absolute path of the yaml file containing the informations of the model to be tested. default: `$MLP_BASE/examples/dnn/model_tf_l10u128.yaml`.
 
 - model-name: str. When set, use this name for the path used when storing outputs instead of a hashed version of `--model-file`. default: empty.
 
-- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `network_name` field in the model json data is used when existing, and model-name otherwise. default: empty.
+- model-label: str. When set, use this string for the model label in the plots from the plotting tasks. When empty, the `label` field in the model yaml data is used when existing, else the `name` field in the model yaml data is used when existing, and model-name otherwise. default: empty.
 
 - n-events: int. The number of events to read from each input file for averaging measurements. default: `1`.
 
 - n-calls: int. The number of calls to be performed per evaluation for averaging. default: `100`.
 
-- input-type: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', or a path to a root file. default: random
+- input-data: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', 'ones', or a path to a root file. default: random
 
-- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_13_3_1`
+- cmssw-version: str. The CMSSW version used for the inference. default: `CMSSW_14_1_0_pre3`
 
 - scram-arch: str. The SCRAM architecture used for the inference. default: `slc7_amd64_gcc12`
 
@@ -313,26 +346,42 @@ The number of inferences behind one plotted data point is given by `n-events * n
 
 - view_cmd: str. A command to execute after the task has run to visualize plots right in the terminal (e.g. "imgcat" if installed). default: empty.
 
+- tfaot-batch-rules: str. The dash-separated batch rules used for the inference on tfaot models with each being in the format 'target_size:size_1,size_2,...'. default: empty
+
 
 
 ## Output:
-- `runtime_plot_different_batch_sizes_{batch_size_1}_{batch_size_2}_{...}.pdf`: The plot of the runtime measurement against the different batch sizes given.
+- `runtimes_bs_{batch_size_1}_{batch_size_2}_{...}.pdf`: The plot of the runtime measurement against the different batch sizes given.
 
 ## Example:
 
 ```shell
 law run PlotRuntimes --version test_simple_dnn \
-                     --model-file $MLP_BASE/examples/simple_dnn/model.json \
+                     --model-file $MLP_BASE/examples/dnn/model_tf_l10u128.yaml \
                      --model-name dnn \
-                     --model-label "dnn with CMSSW_13_3_1" \
+                     --model-label "dnn with CMSSW_14_1_0_pre3" \
                      --n-calls 500 \
-                     --cmssw-version CMSSW_13_3_1 \
+                     --cmssw-version CMSSW_14_1_0_pre3 \
                      --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
-                     --log-y False \
+                     --y-log False \
                      --bs-normalized True
 ```
 
-# PlotRuntimesMultipleParams
+AOT model:
+
+```shell
+law run MeasureRuntime --version test_aot_model \
+                       --model-file $MLP_BASE/examples/dnn/model_tfaot_l10u256_bs.yaml \
+                       --model-name AOT_dnn \
+                       --n-calls 500 \
+                       --cmssw-version CMSSW_14_1_0_pre3 \
+                       --batch-sizes 1,2,4,8,16\
+                       --y-log False \
+                       --bs-normalized True \
+                       --tfaot-batch-rules "1:1-2:2-4:1,1,2-8:2,2,2,2-16:1,1,1,1,2,2,2,2,2,2"
+```
+
+# PlotMultiRuntimes
 
 This task plots the results of the runtime measurement against the given batch sizes for several values of the given parameters.
 The model-files argument is required and replaces the module-file argument.
@@ -347,23 +396,29 @@ The number of inferences behind one plotted data point is given by `n-events * n
 - The .csv files from the `MergeRuntimes` task.
 
 ## Parameters:
-- model-files: str. The comma-separated list of the absolute paths of the json files containing the informations of the model to be tested. No default value.
+- model-files: str. The comma-separated list of the absolute paths of the yaml files containing the informations of the model to be tested. No default value.
 
-- cmssw-versions: str. The comma-separated list of CMSSW versions used for the inference. default: `CMSSW_13_3_1`
+- cmssw-versions: str. The comma-separated list of CMSSW versions used for the inference. default: `CMSSW_14_1_0_pre3`
 
 - scram-archs: str. The comma-separated list of SCRAM architectures used for the inference. default: `slc7_amd64_gcc12`
 
 - model-names: str. The comma-separated list of model names. When set, use these names for the path used when storing outputs instead of a hashed version of `--model-file`. default: empty.
 
-- model-labels: str. The comma-separated list of model labels. When set, use these strings for the model labels in the plots from the plotting tasks. When empty, the `network_name` fields in the models json data is used when existing, and model-names otherwise. default: empty.
+- model-labels: str. The comma-separated list of model labels. When set, use these strings for the model labels in the plots from the plotting tasks. When empty, the `label` fields in the models yaml data are used when existing, else the `name` fields in the models yaml data are used when existing, and model-names otherwise. default: empty.
 
-- log-y: bool. Plot the y-axis values logarithmically; default: `False`.
+- y-log: bool. Plot the y-axis values logarithmically; default: `False`.
+
+- x-log: bool. Plot the x-axis values logarithmically; default: `False`.
+
+- y-min = float. Minimum y-axis value. default: empty
+
+- y-max: float. Maximum y-axis value. default: empty
 
 - bs-normalized: bool. Normalize the measured values with the batch size before plotting; default: `True`.
 
-- top-right-label: str. When set, stick this string as label over the top right corner of the plot. default: empty.
+- error-style: str. Style of errors / uncertainties due to averaging; choices: `bars`,`band`; default: `band`.
 
-- filling: bool. Plot the errors as error bands instead of error bars; default: `True`.
+- top-right-label: str. When set, stick this string as label over the top right corner of the plot. default: empty.
 
 - batch-sizes: int. The comma-separated list of batch sizes to be tested; default: `1,2,4`.
 
@@ -371,7 +426,7 @@ The number of inferences behind one plotted data point is given by `n-events * n
 
 - n-calls: int. The number of calls to be performed per evaluation for averaging. default: `100`
 
-- input-type: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', or a path to a root file. default: random.
+- input-data: str. Define the kind of inputs used during the measurement, either 'random', 'incremental', 'zeros', 'ones', or a path to a root file. default: random.
 
 - file_types: str. Comma-separated types of the output plot files. default: "pdf".
 
@@ -380,19 +435,19 @@ The number of inferences behind one plotted data point is given by `n-events * n
 - view_cmd: str. A command to execute after the task has run to visualize plots right in the terminal (e.g. "imgcat" if installed). default: empty.
 
 ## Output:
-- `runtime_plot_networks_{param_1}_{param_2}_{...}_different_batch_sizes_{batch_size_1}_{batch_size_2}_{...}.pdf`: The plot of the runtime measurements against the different batch sizes given.
+- `runtimes_{param_1}_{param_2}_{...}_bs_{batch_size_1}_{batch_size_2}_{...}.pdf`: The plot of the runtime measurements against the different batch sizes given.
 
 ## Example:
 
 ```shell
-law run PlotRuntimesMultipleParams --version test_several_networks \
-                                   --model-files $MLP_BASE/examples/simple_dnn/model.json,$MLP_BASE/examples/simple_dnn/model_onnx.json\
+law run PlotMultiRuntimes --version test_several_networks \
+                                   --model-files $MLP_BASE/examples/dnn/model_tf_l10u128.yaml,$MLP_BASE/examples/dnn/model_onnx_l10u128.yaml\
                                    --model-names "dnn","dnn_onnx"\
                                    --model-labels "dnn","dnn onnx"\
                                    --cmssw-versions CMSSW_13_3_1,CMSSW_13_2_4 \
                                    --n-calls 500 \
                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
-                                   --log-y False \
+                                   --y-log False \
                                    --bs-normalized True \
                                    --top-right-label "$\sqrt{s}=13.6$ TeV"
 ```
@@ -400,14 +455,14 @@ law run PlotRuntimesMultipleParams --version test_several_networks \
 equivalent to the brace expanded version:
 
 ```shell
-law run PlotRuntimesMultipleParams --version test_several_networks \
-                                   --model-files "$MLP_BASE/examples/{simple_dnn/model,simple_dnn/model_onnx}.json"\
+law run PlotMultiRuntimes --version test_several_networks \
+                                   --model-files "$MLP_BASE/examples/dnn/model_{tf,onnx}_l10u128.yaml"\
                                    --model-names "dnn","dnn_onnx"\
                                    --model-labels "dnn","dnn onnx"\
                                    --cmssw-versions "CMSSW_13_{3_1,2_4}" \
                                    --n-calls 500 \
                                    --batch-sizes 1,2,4,8,16,32,64,128,256,512,1024 \
-                                   --log-y False \
+                                   --y-log False \
                                    --bs-normalized True \
                                    --top-right-label "$\sqrt{s}=13.6$ TeV"
 ```

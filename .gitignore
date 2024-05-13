@@ -14,6 +14,7 @@
 *.hdf5
 *.out
 *.parquet
+*.vscode
 .coverage
 coverage*.xml
 __pycache__
@@ -26,3 +27,4 @@ software
 data
 .data
 .law
+.python-version
