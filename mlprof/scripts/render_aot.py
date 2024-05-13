@@ -63,11 +63,11 @@ def render_aot(plugin_file: str, header_file: str, model_name: str) -> None:
     ]
     # untied inference
     content["untied_inference"] = [
-        f"model_.run<{', '.join(output_arrays)}>(batchSize_, {', '.join(input_names)});"
+        f"model_.run<{', '.join(output_arrays)}>(batchSize_, {', '.join(input_names)});",
     ]
     # tied inference
     content["tied_inference"] = [
-        f"std::tie({', '.join(output_names)}) = {content['untied_inference'][0]};"
+        f"std::tie({', '.join(output_names)}) = {content['untied_inference'][0]};",
     ]
 
     # read the plugin file content
@@ -84,7 +84,7 @@ def render_aot(plugin_file: str, header_file: str, model_name: str) -> None:
 
 
 def parse_signatures(header_file: str) -> tuple[list[Input], list[Output]]:
-    from cms_tfaot import parse_header
+    from cms_tfaot import parse_header  # type: ignore[import-not-found]
 
     # extract header header
     header_data = parse_header(header_file)

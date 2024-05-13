@@ -1,6 +1,6 @@
 # coding: utf-8
 
-import law
+import law  # type: ignore[import-untyped]
 
 
 # enable contrib packages

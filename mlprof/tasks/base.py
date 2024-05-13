@@ -4,10 +4,12 @@
 Generic tools and base tasks that are defined along typical objects in an analysis.
 """
 
+from __future__ import annotations
+
 import os
 
-import luigi
-import law
+import luigi  # type: ignore[import-untyped]
+import law  # type: ignore[import-untyped]
 
 from collections import OrderedDict
 
@@ -19,7 +21,7 @@ class BaseTask(law.SandboxTask):
     )
 
     allow_empty_sandbox = True
-    sandbox = None
+    sandbox: str | None = None
 
     task_namespace = None
     local_workflow_require_branches = False
@@ -97,8 +99,8 @@ class CommandTask(BaseTask):
     run_command_in_tmp = False
 
     def _print_command(self, args):
-        from law.task.interactive import fmt_chars, _print_wrapped
-        from law.util import colored, get_terminal_width
+        from law.task.interactive import fmt_chars, _print_wrapped  # type: ignore[import-untyped]
+        from law.util import colored, get_terminal_width  # type: ignore[import-untyped]
 
         max_depth = int(args[0])
 

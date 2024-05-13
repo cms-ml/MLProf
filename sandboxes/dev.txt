@@ -1,0 +1,12 @@
+# all packages needed for development
+
+-r base.txt
+-r plotting.txt
+
+git+https://github.com/riga/law.git@master
+mypy~=1.9.0
+flake8~=7.0
+flake8-commas~=2.1.0
+flake8-quotes~=3.3.2
+types-docutils~=0.20.0
+pandas-stubs

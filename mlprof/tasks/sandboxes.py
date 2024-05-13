@@ -6,12 +6,12 @@ Collection of the sandbox tasks for the different tasks
 
 import os
 
-import law
+import law  # type: ignore[import-untyped]
 
-from mlprof.tasks.parameters import CMSSWParameters
+from mlprof.tasks.parameters import CMSSWParameters, ModelParameters
 
 
-class CMSSWSandboxTask(CMSSWParameters):
+class CMSSWSandboxTask(CMSSWParameters, ModelParameters):
     """
     Base class for tasks in cmssw sandboxes.
     """
@@ -55,7 +55,7 @@ class CMSSWSandboxTask(CMSSWParameters):
     def sandbox(self):
         # preparations
         args = self.cmssw_setup_args
-        install_dir = os.path.join(*filter(bool, ["$MLP_CMSSW_BASE", self.cmssw_install_dir]))
+        install_dir = os.path.join("$MLP_CMSSW_BASE", self.cmssw_install_dir)
 
         # sandbox parts
         parts = [
@@ -69,3 +69,6 @@ class CMSSWSandboxTask(CMSSWParameters):
             parts.append(f"args={args}")
 
         return "::".join(parts)
+
+    def run(self):
+        raise NotImplementedError

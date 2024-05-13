@@ -18,9 +18,6 @@ action() {
     # define additional model variables
     local tool_name="tfaot-model-mlprof-test"
 
-    # temporarily prepend the local cms_tfaot path
-    export PYTHONPATH="${MLP_BASE}/modules/cms-tfaot:${PYTHONPATH}"
-
     # remove existing code
     rm -rf MLProf
 

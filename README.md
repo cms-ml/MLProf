@@ -1,6 +1,6 @@
 # MLProf
 
-[![Lint and test](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml/badge.svg)](https://github.com/uhh-cms/MLProf/actions/workflows/lint.yml)
+[![Lint and test](https://github.com/cms-ml/MLProf/actions/workflows/lint_and_test.yml/badge.svg)](https://github.com/cms-ml/MLProf/actions/workflows/lint_and_test.yml)
 
 Tools for automated ML model performance tests in CMSSW (CMSSW version 13 and above).
 

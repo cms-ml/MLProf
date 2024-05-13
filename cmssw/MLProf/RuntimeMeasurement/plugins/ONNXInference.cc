@@ -149,7 +149,10 @@ ONNXInference::ONNXInference(const edm::ParameterSet& iConfig, const ONNXRuntime
   // initialize the input data arrays
   // note there is only one element in the FloatArrays type (i.e. vector<vector<float>>) variable
   for (int i = 0; i < nInputs_; i++) {
-    inputArrays_.emplace_back(batchSize_ * flatInputSizes_[i], 0);
+    // multiply the size of all dimensions in an input
+    int full_size_input = std::accumulate(begin(input_shapes_[i]), end(input_shapes_[i]), 1, std::multiplies<int>());
+    // initialize inputArrays_ with 0s at first
+    inputArrays_.emplace_back(full_size_input, 0);
   }
 }
 
