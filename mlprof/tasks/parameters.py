@@ -70,8 +70,8 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_14_1_X_2024-04-15-2300",
-        description="CMSSW version; default: CMSSW_14_1_X_2024-04-15-2300",
+        default="CMSSW_14_1_0_pre3",
+        description="CMSSW version; default: CMSSW_14_1_0_pre3",
     )
     scram_arch = luigi.Parameter(
         default="slc7_amd64_gcc12",
@@ -171,9 +171,9 @@ class ModelParameters(BaseTask):
     """
 
     model_file = luigi.Parameter(
-        default="$MLP_BASE/examples/simple_dnn/model_tf.yaml",
+        default="$MLP_BASE/examples/dnn/model_tf_l10u128.yaml",
         description="json or yaml file containing information of model to be tested; "
-        "default: $MLP_BASE/examples/simple_dnn/model_tf.yaml",
+        "default: $MLP_BASE/examples/dnn/model_tf_l10u128.yaml",
     )
     model_name = luigi.Parameter(
         default=law.NO_STR,
@@ -182,8 +182,9 @@ class ModelParameters(BaseTask):
     )
     model_label = luigi.Parameter(
         default=law.NO_STR,
-        description="when set, use this label in plots; when empty, the 'network_name' field in the model json data is "
-        "used when existing, and full_name otherwise; default: empty",
+        description="when set, use this label in plots; when empty, the `label` field in the model "
+        "yaml data is used when existing, else the `name` field in the model yaml data is used when "
+        "existing and model-name otherwise; default: empty",
     )
 
     @classmethod
@@ -233,8 +234,9 @@ class MultiModelParameters(BaseTask):
     )
     model_labels = law.CSVParameter(
         default=law.NO_STR,
-        description="when set, use this label in plots; when empty, the 'network_name' field in the "
-        "model json data is used when existing, and full_model_name otherwise; default: empty",
+        description="when set, use these labels in plots; when empty, the `label` fields in the models "
+        "yaml data are used when existing, else the `name` fields in the models yaml data are used when "
+        "existing and model-names otherwise; default: empty",
     )
 
     def __init__(self, *args, **kwargs):
@@ -329,7 +331,7 @@ class CustomPlotParameters(BaseTask):
         choices=["bars", "band"],
         default="band",
         significant=False,
-        description="style of errors / uncerainties of due to averaging; choices: bars,band; default: band",
+        description="style of errors / uncertainties due to averaging; choices: bars,band; default: band",
     )
     top_right_label = luigi.Parameter(
         default=law.NO_STR,

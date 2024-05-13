@@ -150,6 +150,9 @@ def plot_batch_size_several_measurements(
         # create legend
         ax.legend(legend_entries, measurements_labels_strs)
 
+        if not plot_params.get("y_log"):
+            ax.set_ylim(bottom=0)
+
         # additional customizations
         apply_customizations(plot_params, fig, ax)
 
@@ -162,8 +165,6 @@ def plot_batch_size_several_measurements(
 
         # y axis
         ax.set_ylabel("Runtime / batch size [ms]" if plot_params["bs_normalized"] else "Runtime [ms]")
-        if not plot_params.get("y_log"):
-            ax.set_ylim(bottom=0)
 
         # texts
         mplhep.cms.text(text="Simulation, MLProf", loc=0)
