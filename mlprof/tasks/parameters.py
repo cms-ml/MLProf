@@ -22,12 +22,12 @@ class CMSSWParameters(BaseTask):
     """
 
     cmssw_version = luigi.Parameter(
-        default="CMSSW_14_1_0_pre3",
-        description="CMSSW version; default: CMSSW_14_1_0_pre3",
+        default="CMSSW_14_1_0_pre4",
+        description="CMSSW version; default: CMSSW_14_1_0_pre4",
     )
     scram_arch = luigi.Parameter(
-        default="slc7_amd64_gcc12",
-        description="SCRAM architecture; default: slc7_amd64_gcc12",
+        default="el9_amd64_gcc12",
+        description="SCRAM architecture; default: el9_amd64_gcc12",
     )
 
     def store_parts(self):
