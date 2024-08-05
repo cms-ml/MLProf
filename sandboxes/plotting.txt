@@ -2,5 +2,5 @@
 
 numpy~=2.0.1
 pandas~=2.2.2
-matplotlib~=3.9.1
+matplotlib~=3.9.0
 mplhep~=0.3.50
