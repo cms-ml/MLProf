@@ -157,9 +157,9 @@ def plot_batch_size_several_measurements(
 
         # create plot with curves using a single color for each value-error pair
         legend_entries = []
-        if plot_params.get("custom_colors"):
+        if plot_params.get("default_colors"):
             # set the color cycle to the custom color cycle
-            ax._get_lines.set_prop_cycle(cycler("color", colors[plot_params.get("custom_colors")]))
+            ax._get_lines.set_prop_cycle(cycler("color", colors[plot_params.get("default_colors")]))
 
         for i, data in enumerate(plot_data):
             color_used = color_list[i] if color_list[i] else ax._get_lines.get_next_color()

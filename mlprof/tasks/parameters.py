@@ -313,7 +313,7 @@ class CustomPlotParameters(BaseTask):
         significant=False,
         description="stick a label over the top right corner of the plot",
     )
-    custom_colors = luigi.ChoiceParameter(
+    default_colors = luigi.ChoiceParameter(
         choices=["mpl", "cms_6", "atlas_10"],
         default="cms_6",
         significant=False,
@@ -331,5 +331,5 @@ class CustomPlotParameters(BaseTask):
             "bs_normalized": self.bs_normalized,
             "error_style": self.error_style,
             "top_right_label": None if self.top_right_label == law.NO_STR else self.top_right_label,
-            "custom_colors": self.custom_colors,
+            "default_colors": self.default_colors,
         }
