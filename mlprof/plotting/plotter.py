@@ -1,11 +1,30 @@
 # coding: utf-8
 
 colors = {
-    "mpl_standard": [
+    "mpl": [
         "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
     ],
-    "custom_edgecolor": ["#CC4F1B", "#1B2ACC", "#3F7F4C"],
-    "custom_facecolor": ["#FF9848", "#089FFF", "#7EFF99"],
+    # Atlas and cms standards correspond to results in :
+    # Color wheel from https://arxiv.org/pdf/2107.02270 Table 1, 10 color palette
+    # hexacodes in https://github.com/mpetroff/accessible-color-cycles/blob/0a17e754d9f83161baffd803dcea8bee7d95a549/readme.md#final-results # noqa
+    # as implemented in mplhep
+    "cms_6": [
+        "#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd",
+    ],
+    "atlas_10": [
+        "#3f90da",
+        "#ffa90e",
+        "#bd1f01",
+        "#94a4a2",
+        "#832db6",
+        "#a96b59",
+        "#e76300",
+        "#b9ac70",
+        "#717581",
+        "#92dadd",
+    ],
+    # "custom_edgecolor": ["#CC4F1B", "#1B2ACC", "#3F7F4C"],
+    # "custom_facecolor": ["#FF9848", "#089FFF", "#7EFF99"],
 }
 
 
@@ -86,7 +105,7 @@ def fill_plot(x, y, y_down, y_up, error_style, color):
     if error_style == "band":
         p1 = plt.plot(x, y, "-", color=color)
         plt.fill_between(x, y - y_down, y + y_up, alpha=0.5, facecolor=color)
-        p2 = plt.fill(np.NaN, np.NaN, alpha=0.5, color=color)
+        p2 = plt.fill(np.nan, np.nan, alpha=0.5, color=color)
         legend = (p1[0], p2[0])
     else:  # bars
         p = plt.errorbar(x, y, yerr=(y_down, y_up), capsize=12, marker=".", linestyle="")
@@ -100,6 +119,7 @@ def plot_batch_size_several_measurements(
     input_paths,
     output_path,
     measurements,
+    color_list,
     plot_params,
 ):
     """
@@ -114,6 +134,7 @@ def plot_batch_size_several_measurements(
     """
     import matplotlib.pyplot as plt
     import mplhep  # type: ignore[import-untyped]
+    from cycler import cycler
 
     if isinstance(measurements[0], str):
         measurements_labels_strs = list(measurements)
@@ -136,14 +157,19 @@ def plot_batch_size_several_measurements(
 
         # create plot with curves using a single color for each value-error pair
         legend_entries = []
-        for data in plot_data:
+        if plot_params.get("default_colors"):
+            # set the color cycle to the custom color cycle
+            ax._get_lines.set_prop_cycle(cycler("color", colors[plot_params.get("default_colors")]))
+
+        for i, data in enumerate(plot_data):
+            color_used = color_list[i] if color_list[i] else ax._get_lines.get_next_color()
             entry = fill_plot(
                 x=batch_sizes,
                 y=data["y"],
                 y_down=data["y_down"],
                 y_up=data["y_up"],
                 error_style=plot_params["error_style"],
-                color=ax._get_lines.get_next_color(),
+                color=color_used,
             )
             legend_entries.append(entry)
 

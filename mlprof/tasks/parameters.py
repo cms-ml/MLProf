@@ -211,6 +211,7 @@ class MultiModelParameters(BaseTask):
         description="when set, use these labels in plots; when empty, the `label` fields in the models "
         "yaml data are used when existing, else the `name` fields in the models yaml data are used when "
         "existing and model-names otherwise; default: empty",
+        brace_expand=True,
     )
 
     def __init__(self, *args, **kwargs):
@@ -312,6 +313,13 @@ class CustomPlotParameters(BaseTask):
         significant=False,
         description="stick a label over the top right corner of the plot",
     )
+    default_colors = luigi.ChoiceParameter(
+        choices=["mpl", "cms_6", "atlas_10"],
+        default="cms_6",
+        significant=False,
+        description="default color cycle to use; choices: 'mpl', 'cms_6', 'atlas_10'"
+        "; default: 'cms_6'",
+    )
 
     @property
     def custom_plot_params(self):
@@ -323,4 +331,5 @@ class CustomPlotParameters(BaseTask):
             "bs_normalized": self.bs_normalized,
             "error_style": self.error_style,
             "top_right_label": None if self.top_right_label == law.NO_STR else self.top_right_label,
+            "default_colors": self.default_colors,
         }

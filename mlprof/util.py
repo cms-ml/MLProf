@@ -26,6 +26,7 @@ class Model(object):
         self.model_file = expand_path(model_file, abs=True)
         self.name = name
         self.label = label
+        self._color = None
 
         # cached data
         self._all_data = None
@@ -67,3 +68,9 @@ class Model(object):
 
         # fallback to the full model name
         return self.full_name
+
+    @property
+    def color(self):
+        if self._color is None:
+            self._color = self.data.get("color")
+        return self._color

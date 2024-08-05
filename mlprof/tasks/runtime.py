@@ -150,6 +150,7 @@ class PlotRuntimes(
             [self.input().path],
             output.path,
             [self.model.full_model_label],
+            [self.model.color],
             self.custom_plot_params,
         )
         print("plot saved")
@@ -280,5 +281,6 @@ class PlotMultiRuntimes(
             input_paths=input_paths,
             output_path=output.path,
             measurements=self.params_product_params_to_write,
+            color_list=[model.color for model in self.models],
             plot_params=self.custom_plot_params,
         )

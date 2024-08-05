@@ -1,6 +1,6 @@
-# version 1
+# version 2
 
-numpy
-pandas
-matplotlib
-mplhep
+numpy~=2.0.1
+pandas~=2.2.2
+matplotlib~=3.9.0
+mplhep~=0.3.50
