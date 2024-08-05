@@ -119,6 +119,7 @@ def plot_batch_size_several_measurements(
     input_paths,
     output_path,
     measurements,
+    color_list,
     plot_params,
 ):
     """
@@ -160,14 +161,15 @@ def plot_batch_size_several_measurements(
             # set the color cycle to the custom color cycle
             ax._get_lines.set_prop_cycle(cycler("color", colors[plot_params.get("custom_colors")]))
 
-        for data in plot_data:
+        for i, data in enumerate(plot_data):
+            color_used = color_list[i] if color_list[i] else ax._get_lines.get_next_color()
             entry = fill_plot(
                 x=batch_sizes,
                 y=data["y"],
                 y_down=data["y_down"],
                 y_up=data["y_up"],
                 error_style=plot_params["error_style"],
-                color=ax._get_lines.get_next_color(),
+                color=color_used,
             )
             legend_entries.append(entry)
 
